@@ -11,6 +11,11 @@ project(BuildLens VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 如果用 Clang 编译，生成 -ftime-trace JSON，可用于 BuildLens 自测。
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftime-trace")
+endif()
+
 # Qt MOC：自动调用 moc 处理 Q_OBJECT 宏，
 # 无需手动运行 moc 或将 moc_*.cpp 加入源文件列表。
 set(CMAKE_AUTOMOC ON)
@@ -19,6 +24,7 @@ set(CMAKE_AUTOMOC ON)
 # 固定 Qt 5.15.2 版本，版本不匹配时 CMake 配置直接报错。
 # 在 CLion/VS2022 中通过 CMAKE_PREFIX_PATH 指定 Qt 安装路径，
 # 例如：-DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/msvc2019_64/lib/cmake
+set(CMAKE_PREFIX_PATH "D:/Software/Qt5.15.2/5.15.2/msvc2019_64")
 find_package(Qt5 5.15.2 EXACT REQUIRED COMPONENTS Widgets Core)
 
 # ----- 可执行目标 -----

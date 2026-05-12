@@ -1,0 +1,9 @@
+{
+  "traceEvents": [
+    {"cat": "phase", "name": "Parse", "dur": 4800},
+    {"cat": "phase", "name": "Instantiate", "dur": 22100},
+    {"cat": "phase", "name": "Optimize", "dur": 3200},
+    {"cat": "phase", "name": "CodeGen", "dur": 1600},
+    {"cat": "phase", "name": "Total", "dur": 31700}
+  ]
+}

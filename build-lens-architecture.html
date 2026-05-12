@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BuildLens Architecture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f5f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f9fafb;
+      --text: #172033;
+      --muted: #647084;
+      --line: #d8dee9;
+      --core: #0f766e;
+      --model: #6d28d9;
+      --ui: #0369a1;
+      --build: #c2410c;
+      --risk: #be123c;
+      --shadow: 0 18px 45px rgba(23, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+        "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: #111827;
+      color: #ffffff;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-copy {
+      padding: 30px 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 780px;
+      font-size: 34px;
+      line-height: 1.18;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: #374151;
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .snapshot {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-self: center;
+    }
+
+    .metric {
+      min-height: 104px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 24px;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .section {
+      margin-top: 22px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-size: 20px;
+      line-height: 1.3;
+      font-weight: 780;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .system-map {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .map-canvas {
+      min-width: 1040px;
+      padding: 24px;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 150px repeat(5, 1fr);
+      gap: 12px;
+      align-items: stretch;
+      min-height: 116px;
+      margin-bottom: 14px;
+    }
+
+    .lane:last-child {
+      margin-bottom: 0;
+    }
+
+    .lane-title {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 14px;
+      border-radius: 8px;
+      color: #ffffff;
+      font-weight: 760;
+    }
+
+    .lane-title small {
+      display: block;
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.84;
+    }
+
+    .lane-title.build {
+      background: var(--build);
+    }
+
+    .lane-title.ui {
+      background: var(--ui);
+    }
+
+    .lane-title.core {
+      background: var(--core);
+    }
+
+    .lane-title.model {
+      background: var(--model);
+    }
+
+    .node {
+      position: relative;
+      min-height: 96px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .node::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      width: 12px;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .node.end::after,
+    .node.span-2::after {
+      display: none;
+    }
+
+    .node h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 760;
+    }
+
+    .node p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .node code,
+    .file-link,
+    td code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    .accent {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .accent.build {
+      background: var(--build);
+    }
+
+    .accent.ui {
+      background: var(--ui);
+    }
+
+    .accent.core {
+      background: var(--core);
+    }
+
+    .accent.model {
+      background: var(--model);
+    }
+
+    .span-2 {
+      grid-column: span 2;
+    }
+
+    .call-chain {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .chain-card,
+    .info-card,
+    .risk-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .chain-card {
+      padding: 16px;
+    }
+
+    .chain-card .step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      margin-bottom: 12px;
+      border-radius: 999px;
+      background: #111827;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .chain-card h3 {
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .chain-card p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .info-card {
+      padding: 16px;
+    }
+
+    .info-card h3,
+    .risk-card h3 {
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .info-card ul,
+    .risk-card ul {
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .info-card li,
+    .risk-card li {
+      display: flex;
+      gap: 8px;
+      margin: 7px 0;
+    }
+
+    .info-card li::before,
+    .risk-card li::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      margin-top: 7px;
+      border-radius: 999px;
+      background: currentColor;
+      flex: 0 0 auto;
+      opacity: 0.7;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      min-width: 820px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+
+    th {
+      background: #eef2f7;
+      color: #344055;
+      font-weight: 760;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td {
+      color: var(--muted);
+    }
+
+    td:first-child {
+      color: var(--text);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .file-link {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .risk-card {
+      padding: 16px;
+      border-color: rgba(190, 18, 60, 0.24);
+    }
+
+    .risk-card h3 {
+      color: var(--risk);
+    }
+
+    .footer {
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 920px) {
+      .page {
+        padding: 24px 16px 36px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-copy {
+        padding: 12px 0 0;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .section-note {
+        text-align: left;
+      }
+
+      .call-chain,
+      .grid-3,
+      .risk-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .snapshot {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 25px;
+      }
+
+      .lead {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-mark">BL</span>
+        <span>BuildLens Architecture</span>
+      </div>
+      <span>基于当前源码快照更新：2026-05-12</span>
+    </div>
+
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <h1 id="page-title">Qt Widgets 桌面端的 -ftime-trace 数据加载、整理与展示链路</h1>
+        <p class="lead">
+          这份架构页按仓库里的实际实现整理：入口在 <code>main.cpp</code>，界面由
+          <code>MainWindow</code> 串联，JSON 解析集中在 <code>TraceParser</code>，表格展示通过
+          <code>TraceTableModel</code> 和 <code>QSortFilterProxyModel</code> 完成。
+        </p>
+        <div class="meta-row" aria-label="技术标签">
+          <span class="tag">C++17</span>
+          <span class="tag">CMake 3.16+</span>
+          <span class="tag">Qt 5.15.2 Widgets</span>
+          <span class="tag">QAbstractTableModel</span>
+          <span class="tag">Clang -ftime-trace</span>
+        </div>
+      </div>
+
+      <aside class="snapshot" aria-label="源码快照">
+        <div class="metric">
+          <strong>8</strong>
+          <span>源码文件，分布在 core / model / ui / main</span>
+        </div>
+        <div class="metric">
+          <strong>3</strong>
+          <span>表格列：文件名、耗时、源路径</span>
+        </div>
+        <div class="metric">
+          <strong>1</strong>
+          <span>可执行目标：BuildLens</span>
+        </div>
+        <div class="metric">
+          <strong>8</strong>
+          <span>resources/sample 下的示例 JSON</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" aria-labelledby="map-title">
+      <div class="section-header">
+        <h2 id="map-title">系统分层图</h2>
+        <p class="section-note">从构建配置到界面展示，按真实调用方向排列。</p>
+      </div>
+
+      <div class="system-map">
+        <div class="map-canvas">
+          <div class="lane">
+            <div class="lane-title build">构建与输入<small>Build / Input</small></div>
+            <div class="node">
+              <h3><span class="accent build"></span><code>CMakeLists.txt</code></h3>
+              <p>声明 C++17、AUTOMOC、Qt5 Widgets/Core；Clang 编译时追加 <code>-ftime-trace</code>。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent build"></span><code>BuildLens</code></h3>
+              <p>单一 Qt Widgets 可执行目标，包含 main、core、model、ui 四组源文件。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent build"></span>用户选择目录</h3>
+              <p><code>QFileDialog::getExistingDirectory</code> 选择包含 JSON 的构建输出目录。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent build"></span><code>*.json</code></h3>
+              <p>当前只读取所选目录下的一层 <code>*.json</code> 文件，并按文件名排序。</p>
+            </div>
+            <div class="node end">
+              <h3><span class="accent build"></span>Trace Events</h3>
+              <p>解析 <code>traceEvents</code> 数组，提取总耗时事件的 <code>dur</code> 字段。</p>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-title core">核心数据层<small>Core</small></div>
+            <div class="node">
+              <h3><span class="accent core"></span><code>TraceParser::ParseDirectory</code></h3>
+              <p>校验目录存在性，枚举 JSON，逐个调用 <code>ParseFile</code>。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent core"></span><code>TraceParser::ParseFile</code></h3>
+              <p>读取文件、解析 <code>QJsonDocument</code>，失败时返回耗时为 0 的记录。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent core"></span><code>ExtractTotalDuration</code></h3>
+              <p>当前实现匹配 <code>ph=="X"</code> 且 <code>name=="ExecuteCompiler"</code>，微秒转毫秒。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent core"></span><code>InferSourceName</code></h3>
+              <p>从 JSON 文件名去掉末尾 <code>.json</code>，得到展示用源文件名。</p>
+            </div>
+            <div class="node end">
+              <h3><span class="accent core"></span><code>TraceRecord</code></h3>
+              <p>承载 <code>filename</code>、<code>total_duration_ms</code>、<code>source_path</code>。</p>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-title model">模型适配层<small>Model</small></div>
+            <div class="node span-2">
+              <h3><span class="accent model"></span><code>TraceTableModel</code></h3>
+              <p>继承 <code>QAbstractTableModel</code>，把 <code>std::vector&lt;TraceRecord&gt;</code> 适配为三列表格。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent model"></span><code>SetRecords</code></h3>
+              <p>重置模型数据，并默认按耗时数值降序排列。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent model"></span><code>data/headerData</code></h3>
+              <p>提供展示文本、表头名称和耗时列右对齐；耗时显示为 ms 或 s。</p>
+            </div>
+            <div class="node end">
+              <h3><span class="accent model"></span><code>QSortFilterProxyModel</code></h3>
+              <p>界面层创建代理模型，用于文件名过滤和表头交互排序。</p>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-title ui">界面层<small>UI</small></div>
+            <div class="node">
+              <h3><span class="accent ui"></span><code>main.cpp</code></h3>
+              <p>初始化 <code>QApplication</code>，设置应用元信息，创建并显示 <code>MainWindow</code>。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent ui"></span><code>MainWindow</code></h3>
+              <p>管理菜单、过滤框、表格、状态栏，以及加载目录的用户操作。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent ui"></span><code>QLineEdit</code></h3>
+              <p>文本变化后调用 <code>setFilterFixedString</code>，按文件名忽略大小写过滤。</p>
+            </div>
+            <div class="node">
+              <h3><span class="accent ui"></span><code>QTableView</code></h3>
+              <p>展示代理模型，启用表头排序、隔行颜色、单行选择和列宽自适应。</p>
+            </div>
+            <div class="node end">
+              <h3><span class="accent ui"></span><code>QStatusBar</code></h3>
+              <p>基于过滤后的可见行计算文件数、总耗时和平均耗时。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="flow-title">
+      <div class="section-header">
+        <h2 id="flow-title">关键调用链</h2>
+        <p class="section-note">用户操作触发后，数据如何从文件系统走到表格。</p>
+      </div>
+
+      <div class="call-chain">
+        <article class="chain-card">
+          <span class="step">1</span>
+          <h3>打开目录</h3>
+          <p><code>文件(&amp;F) → 打开目录…</code> 或 <code>Ctrl+O</code> 触发 <code>OnOpenDirectory</code>，拿到目录路径后进入 <code>LoadDirectory</code>。</p>
+        </article>
+        <article class="chain-card">
+          <span class="step">2</span>
+          <h3>解析 JSON</h3>
+          <p><code>TraceParser::ParseDirectory</code> 枚举当前目录 JSON，<code>ParseFile</code> 读取 <code>traceEvents</code> 并过滤耗时大于 0 的记录。</p>
+        </article>
+        <article class="chain-card">
+          <span class="step">3</span>
+          <h3>刷新模型</h3>
+          <p><code>TraceTableModel::SetRecords</code> 替换记录列表，默认按耗时降序排序，然后 <code>QTableView</code> 调整列宽。</p>
+        </article>
+        <article class="chain-card">
+          <span class="step">4</span>
+          <h3>交互展示</h3>
+          <p>搜索框更新代理模型过滤条件；状态栏遍历可见行并映射回源模型计算统计信息。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="source-title">
+      <div class="section-header">
+        <h2 id="source-title">源码映射</h2>
+        <p class="section-note">每个文件在架构中的职责边界。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>文件</th>
+              <th>职责</th>
+              <th>关键 API / 类型</th>
+              <th>架构备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a class="file-link" href="CMakeLists.txt">CMakeLists.txt</a></td>
+              <td>配置项目、Qt 依赖、目标源文件和 Clang trace 开关。</td>
+              <td><code>find_package(Qt5 5.15.2 EXACT)</code>、<code>CMAKE_AUTOMOC</code></td>
+              <td>Qt 路径当前写在仓库配置里，换机器时需要调整或改成外部传参。</td>
+            </tr>
+            <tr>
+              <td><a class="file-link" href="src/main.cpp">src/main.cpp</a></td>
+              <td>应用启动入口。</td>
+              <td><code>QApplication</code>、<code>MainWindow</code></td>
+              <td>只负责启动和元信息，不承载业务逻辑。</td>
+            </tr>
+            <tr>
+              <td><a class="file-link" href="src/core/TraceRecord.h">src/core/TraceRecord.h</a></td>
+              <td>定义单条编译记录。</td>
+              <td><code>TraceRecord</code></td>
+              <td><code>source_path</code> 当前保存 JSON 文件路径，不是真实源文件绝对路径。</td>
+            </tr>
+            <tr>
+              <td><a class="file-link" href="src/core/TraceParser.h">src/core/TraceParser.h</a> / <a class="file-link" href="src/core/TraceParser.cpp">.cpp</a></td>
+              <td>扫描目录、读取 JSON、提取总耗时。</td>
+              <td><code>ParseDirectory</code>、<code>ParseFile</code>、<code>ExtractTotalDuration</code></td>
+              <td>解析失败不会抛异常；返回 0 耗时记录后在目录层过滤掉。</td>
+            </tr>
+            <tr>
+              <td><a class="file-link" href="src/model/TraceTableModel.h">src/model/TraceTableModel.h</a> / <a class="file-link" href="src/model/TraceTableModel.cpp">.cpp</a></td>
+              <td>把记录集合适配为 Qt Model/View 表格。</td>
+              <td><code>QAbstractTableModel</code>、<code>sort</code>、<code>data</code></td>
+              <td>模型内置耗时数值排序，但代理模型交互排序还依赖展示数据。</td>
+            </tr>
+            <tr>
+              <td><a class="file-link" href="src/ui/MainWindow.h">src/ui/MainWindow.h</a> / <a class="file-link" href="src/ui/MainWindow.cpp">.cpp</a></td>
+              <td>组装菜单、过滤框、表格和状态栏。</td>
+              <td><code>OnOpenDirectory</code>、<code>LoadDirectory</code>、<code>UpdateStatusBar</code></td>
+              <td>当前实现没有目录拖放和双击打开文件逻辑。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="details-title">
+      <div class="section-header">
+        <h2 id="details-title">实现要点</h2>
+        <p class="section-note">把代码里容易被图省略的细节显式写出来。</p>
+      </div>
+
+      <div class="grid-3">
+        <article class="info-card">
+          <h3>数据生命周期</h3>
+          <ul>
+            <li>目录不存在时返回空记录列表。</li>
+            <li>文件打不开或 JSON 解析失败时得到 0 耗时记录。</li>
+            <li><code>ParseDirectory</code> 只保留 <code>total_duration_ms &gt; 0</code> 的记录。</li>
+          </ul>
+        </article>
+
+        <article class="info-card">
+          <h3>表格展示规则</h3>
+          <ul>
+            <li>三列顺序固定为文件名、耗时、源路径。</li>
+            <li>小于 1000 ms 显示为整数 ms，否则显示一位小数秒。</li>
+            <li>耗时列右对齐，表格隐藏垂直表头。</li>
+          </ul>
+        </article>
+
+        <article class="info-card">
+          <h3>界面交互边界</h3>
+          <ul>
+            <li>打开目录通过系统目录选择器完成。</li>
+            <li>过滤只针对文件名列，且忽略大小写。</li>
+            <li>状态栏统计的是过滤后的可见记录，不是全量记录。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="risk-title">
+      <div class="section-header">
+        <h2 id="risk-title">当前实现观察</h2>
+        <p class="section-note">这些不是文档错误，而是从源码读出的后续优化点。</p>
+      </div>
+
+      <div class="risk-grid">
+        <article class="risk-card">
+          <h3>JSON 事件名兼容性</h3>
+          <ul>
+            <li>代码匹配 <code>ExecuteCompiler</code>，但 <code>resources/sample</code> 使用 <code>Total</code> 事件；样例可能无法被当前解析器加载。</li>
+          </ul>
+        </article>
+
+        <article class="risk-card">
+          <h3>目录扫描范围</h3>
+          <ul>
+            <li>当前只扫描所选目录第一层，不递归构建输出子目录。</li>
+          </ul>
+        </article>
+
+        <article class="risk-card">
+          <h3>交互排序语义</h3>
+          <ul>
+            <li>初始排序是数值排序；表头排序经代理模型时，耗时列可能按展示字符串比较。</li>
+          </ul>
+        </article>
+
+        <article class="risk-card">
+          <h3>已移除虚构能力</h3>
+          <ul>
+            <li>原架构页提到目录拖放等能力，但源码尚未实现；本页已按实际代码修正。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <p class="footer">
+      BuildLens v0.1.0 · Qt5 Widgets · C++17 · 架构文档由当前仓库源码生成式整理
+    </p>
+  </main>
+</body>
+</html>
