@@ -1,0 +1,8 @@
+//
+// Created by yanch on 2026/5/12.
+//
+
+#ifndef BUILD_LENS_TRACERECORD_H
+#define BUILD_LENS_TRACERECORD_H
+
+#endif //BUILD_LENS_TRACERECORD_H
