@@ -1,56 +1,39 @@
-# C++ objects and libs
-*.slo
-*.lo
-*.o
-*.a
-*.la
-*.lai
-*.so
-*.so.*
-*.dll
-*.dylib
+# ---------- 构建输出 ----------
+build/
+cmake-build-*/
+out/
+*.exe
 
-# Qt-es
-object_script.*.Release
-object_script.*.Debug
-*_plugin_import.cpp
-/.qmake.cache
-/.qmake.stash
-*.pro.user
-*.pro.user.*
-*.qbs.user
-*.qbs.user.*
-*.moc
+# ---------- 编译中间文件 ----------
+*.o
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+
+# ---------- Qt 自动生成 ----------
 moc_*.cpp
-moc_*.h
 qrc_*.cpp
 ui_*.h
-*.qmlc
-*.jsc
-Makefile*
-*build-*
-build/
-*.qm
-*.prl
-*.qmlls.ini
+*.pro.user
+object_script.*.*
 
-# Qt unit tests
-target_wrapper.*
+# ---------- IDE ----------
+.idea/
+.vs/
+*.sln
+*.vcxproj*
 
-# QtCreator
-*.autosave
-
-# QtCreator Qml
-*.qmlproject.user
-*.qmlproject.user.*
-
-# QtCreator CMake
-CMakeLists.txt.user*
-
-# QtCreator 4.8< compilation database
+# ---------- CMake 生成 ----------
+CMakeCache.txt
+CMakeFiles/
+Makefile
 compile_commands.json
 
-# QtCreator local machine specific files for imported projects
-*creator.user*
-
-*_qmlcache.qrc
+# ---------- 临时/系统文件 ----------
+*.zip
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
