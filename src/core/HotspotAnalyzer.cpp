@@ -6,46 +6,33 @@
 // ============================================================
 
 #include "core/HotspotAnalyzer.h"
-#include "core/TraceParser.h"  // for FileTraceResult
 
 #include <algorithm>
+#include <functional>
 #include <map>
 
-// static
-HotspotResult HotspotAnalyzer::Analyze(
-    const std::vector<FileTraceResult>& files,
-    Dimension dim,
-    int top_n) {
-  HotspotResult result;
+namespace {
 
-  // 使用 map 按 key 聚合累计耗时和出现次数。
-  // key = 事件名或类别；value = {total_us, count}。
-  std::map<QString, std::pair<double, int>> aggregator;
+using Aggregator = std::map<QString, std::pair<double, int>>;
 
-  double grand_total = 0.0;
-
-  for (const FileTraceResult& file : files) {
-    for (const TraceEvent& ev : file.events) {
-      // 跳过没有耗时的占位事件。
-      if (ev.dur <= 0.0) continue;
-
-      // 确定聚合键。
-      QString key = (dim == Dimension::kByName) ? ev.name : ev.category;
-      if (key.isEmpty()) continue;
-
-      aggregator[key].first += ev.dur;
-      aggregator[key].second += 1;
-      grand_total += ev.dur;
-    }
+void WalkNodes(const TraceNode& node,
+               const std::function<void(const TraceNode&)>& visitor) {
+  visitor(node);
+  for (const TraceNode& child : node.children) {
+    WalkNodes(child, visitor);
   }
+}
 
-  result.grand_total_us = grand_total;
+HotspotResult BuildResult(const Aggregator& aggregator,
+                          double grand_total,
+                          int top_n) {
+  HotspotResult result;
+  result.grand_total_duration_us = grand_total;
 
-  // 转到 vector 排序。
   for (const auto& pair : aggregator) {
     HotspotItem item;
     item.key = pair.first;
-    item.total_duration_us = pair.second.first;
+    item.duration_us = pair.second.first;
     item.occurrence_count = pair.second.second;
     item.percentage = (grand_total > 0.0)
                           ? (pair.second.first / grand_total * 100.0)
@@ -53,16 +40,67 @@ HotspotResult HotspotAnalyzer::Analyze(
     result.hotspots.push_back(item);
   }
 
-  // 按累计耗时降序排列。
   std::sort(result.hotspots.begin(), result.hotspots.end(),
             [](const HotspotItem& a, const HotspotItem& b) {
-              return a.total_duration_us > b.total_duration_us;
+              if (a.duration_us != b.duration_us) {
+                return a.duration_us > b.duration_us;
+              }
+              return a.key.localeAwareCompare(b.key) < 0;
             });
 
-  // 截取 Top-N。
   if (static_cast<int>(result.hotspots.size()) > top_n) {
     result.hotspots.resize(static_cast<size_t>(top_n));
   }
 
   return result;
+}
+
+}  // namespace
+
+// static
+HotspotResult HotspotAnalyzer::Analyze(
+    const std::vector<CompileGraph>& graphs,
+    Dimension dim,
+    int top_n) {
+  Aggregator aggregator;
+  double grand_total = 0.0;
+
+  for (const CompileGraph& graph : graphs) {
+    for (const TraceNode& root : graph.roots) {
+      WalkNodes(root, [&](const TraceNode& node) {
+        if (node.exclusive_duration_us <= 0.0) return;
+        QString key = (dim == Dimension::kByName) ? node.name : node.category;
+        if (key.isEmpty()) return;
+
+        aggregator[key].first += node.exclusive_duration_us;
+        aggregator[key].second += 1;
+        grand_total += node.exclusive_duration_us;
+      });
+    }
+  }
+
+  return BuildResult(aggregator, grand_total, top_n);
+}
+
+// static
+HotspotResult HotspotAnalyzer::AnalyzeSourceHotspots(
+    const std::vector<CompileGraph>& graphs,
+    int top_n) {
+  Aggregator aggregator;
+  double grand_total = 0.0;
+
+  for (const CompileGraph& graph : graphs) {
+    for (const TraceNode& root : graph.roots) {
+      WalkNodes(root, [&](const TraceNode& node) {
+        if (node.name != QStringLiteral("Source")) return;
+        if (node.detail.isEmpty() || node.exclusive_duration_us <= 0.0) return;
+
+        aggregator[node.detail].first += node.exclusive_duration_us;
+        aggregator[node.detail].second += 1;
+        grand_total += node.exclusive_duration_us;
+      });
+    }
+  }
+
+  return BuildResult(aggregator, grand_total, top_n);
 }

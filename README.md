@@ -40,12 +40,14 @@ clang++ -ftime-trace -c your_code.cpp
 ```bash
 cmake -B cmake-build-debug -DCMAKE_PREFIX_PATH="D:/Software/Qt6.8.3/6.8.3/msvc2022_64"
 cmake --build cmake-build-debug
+ctest --test-dir cmake-build-debug --output-on-failure
 ```
 
 | 目标 | 依赖 | 产物 |
 |------|------|------|
 | `BuildLens` | Qt6::Widgets + Core | 桌面 GUI |
 | `BuildLensCLI` | Qt6::Core only | 命令行工具 |
+| `BuildLensCoreTests` | Qt6::Core only | 核心语义回归测试 |
 
 ---
 
@@ -67,24 +69,30 @@ cmake --build cmake-build-debug
 
 ### 1. CriticalPathAnalyzer — "优化什么？"
 
-DFS 遍历调用树，找出从根到叶子的最长耗时路径。
-**合并连续同名节点**（如嵌套的多层 `DebugType`）。
+使用墙钟语义：选择 inclusive 耗时最大的根节点，
+再逐层选择 inclusive 耗时最大的子节点。
+父子耗时不再相加，`totalDurationUs` 等于根节点真实耗时。
+报告同时输出 `inclusiveDurationUs`、`exclusiveDurationUs` 和 `percentageOfRoot`。
 
 ```
-ExecuteCompiler ─→ Frontend (83.9%) ─→ Source×12 ─→ ParseDecl ─→ ParseClass
+ExecuteCompiler ─→ Frontend ─→ Source×13 ─→ ParseClass
 ```
 
 ### 2. HotspotAnalyzer — "哪类事最花时间？"
 
-跨文件按事件名/类别聚合，输出 Top-N 热点。
+跨文件按事件名/类别聚合，默认使用 exclusive 耗时。
+Clang 自带的 `Total ...` 汇总事件会被过滤，避免重复计数。
+`sourceHotspots` 会把 `Source` 事件聚合到具体 header/source 路径。
 
 ```
 hotspotsByCategory:
-  source   ████████████████████████████████████████  50%  ← #include 是最大瓶颈
-  parse    ████████████████████████████               26%
-  driver   ██████████████████                         15%
-  debug    ████                                       3%
-  codegen  ███                                        3%
+  source       46%  ← #include / header 处理
+  parse        32%
+  instantiate  10%
+
+sourceHotspots:
+  D:/Software/LLVM-22.1.0/.../immintrin.h
+  D:/Software/Qt6.8.3/.../QtCore/qnamespace.h
 ```
 
 ### 3. BottleneckDetector — "哪个文件不正常？"
@@ -93,17 +101,33 @@ hotspotsByCategory:
 
 ---
 
+## ⚠️ v0.2 → v0.3 兼容性
+
+v0.3 的 CLI JSON 报告有破坏性 schema 变化：
+
+- `criticalPath.path[]` 不再输出旧的 `durationUs` / `percentage`，改为
+  `inclusiveDurationUs`、`exclusiveDurationUs`、`percentageOfRoot`。
+- `criticalPath.totalDurationUs` 现在等于根节点墙钟耗时，不再把父子耗时相加。
+- 热点默认使用 exclusive 耗时，结果带 `metric: "exclusiveDurationUs"`。
+- 热点项使用 `durationUs`，不再输出旧的 `totalDurationUs`。
+- Clang `Total ...` 汇总事件会被过滤，避免重复计数。
+- 新增 `sourceHotspots`，按具体 header/source 路径聚合 `Source` 事件。
+- `bottlenecks` 新增 `thresholdMs`。
+
+桌面 GUI 仍是文件耗时表格；v0.3 深度分析以 `BuildLensCLI` JSON 报告为准。
+
+---
+
 ## 📁 项目结构
 
 ```
 build-lens/
 ├── CMakeLists.txt
+├── CHANGELOG.md
 ├── README.md
-├── docs/
-│   ├── BuildLens 架构与愿景.md    # 完整架构设计文档
-│   └── 商业分析.md                # 商业化路径分析
 ├── resources/
-│   └── sample/                    # 示例 -ftime-trace JSON
+│   ├── sample/                    # 简化示例 -ftime-trace JSON
+│   └── BuildLensSample/src/       # 真实 Clang fixture trace
 └── src/
     ├── main.cpp                   # GUI 入口
     ├── cli/
@@ -122,6 +146,8 @@ build-lens/
     │   └── TraceTableModel.h/.cpp
     └── ui/                        # Qt GUI
         └── MainWindow.h/.cpp
+└── tests/
+    └── core_tests.cpp             # 核心语义与真实 trace 回归测试
 ```
 
 ---
@@ -131,7 +157,7 @@ build-lens/
 ```
 v0.1 ✅ 桌面 GUI — 表格 + 搜索过滤
 v0.2 ✅ CLI + 三分析器管线 — 关键路径/热点/瓶颈 + JSON 报告
-v0.3 ⏳ 语义修正 — 独占耗时、Total 过滤、Source/header 热点
+v0.3 ✅ 语义修正 — 独占耗时、Total 过滤、Source/header 热点
 v0.4 ⏳ CI/CD 集成 — 多 session 对比、构建回归检测
 v1.0 ⏳ Web Dashboard — 团队协作、AI 优化建议
 ```

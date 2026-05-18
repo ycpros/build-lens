@@ -24,14 +24,20 @@ struct TraceNode {
   // 事件类别，例如 "parse"、"codegen"、"inst"。
   QString category;
 
+  // 事件细节，例如 Source 事件中的规范化头文件路径。
+  QString detail;
+
   // 开始时间，单位微秒。
   double start_us = 0.0;
 
   // 结束时间（start_us + duration），单位微秒。
   double end_us = 0.0;
 
-  // 本事件自身的持续时间，单位微秒（不含子节点重叠部分时为 exclusive 时间）。
+  // 本事件的包含耗时，单位微秒。
   double duration_us = 0.0;
+
+  // 本事件扣除直接子节点后的独占耗时，单位微秒。
+  double exclusive_duration_us = 0.0;
 
   // 所属线程 ID。
   int thread_id = 1;

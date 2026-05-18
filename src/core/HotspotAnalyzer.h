@@ -13,15 +13,15 @@
 
 #include <vector>
 
-#include "core/TraceEvent.h"
+#include "core/TraceGraph.h"
 
 // 单个热点项。
 struct HotspotItem {
   // 聚合维度的值，例如事件名 "ParseAST" 或类别 "parse"。
   QString key;
 
-  // 该维度下所有事件的累计耗时，单位微秒。
-  double total_duration_us = 0.0;
+  // 该维度下所有事件的累计独占耗时，单位微秒。
+  double duration_us = 0.0;
 
   // 该维度下的事件发生次数（出现在多少个文件中）。
   int occurrence_count = 0;
@@ -36,7 +36,10 @@ struct HotspotResult {
   std::vector<HotspotItem> hotspots;
 
   // 所有被统计事件的总耗时，单位微秒。
-  double grand_total_us = 0.0;
+  double grand_total_duration_us = 0.0;
+
+  // 当前结果使用的耗时口径。
+  QString metric = QStringLiteral("exclusiveDurationUs");
 };
 
 // 热点分析器。
@@ -57,13 +60,18 @@ class HotspotAnalyzer {
     kByCategory  // 按事件类别聚合（如 "parse", "codegen", "inst"）
   };
 
-  // 分析多文件事件列表的热点。
-  // files：ParseDirectoryEvents 的输出。
+  // 分析多文件调用图的热点。
+  // graphs：TraceGraphBuilder 输出的调用图。
   // dim：聚合维度。
   // top_n：返回前 N 项热点（默认 10）。
   static HotspotResult Analyze(
-      const std::vector<struct FileTraceResult>& files,
+      const std::vector<CompileGraph>& graphs,
       Dimension dim,
+      int top_n = 10);
+
+  // 专门按 Source 事件 detail 聚合头文件/源文件热点。
+  static HotspotResult AnalyzeSourceHotspots(
+      const std::vector<CompileGraph>& graphs,
       int top_n = 10);
 };
 

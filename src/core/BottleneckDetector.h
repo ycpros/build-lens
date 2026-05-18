@@ -39,6 +39,9 @@ struct BottleneckResult {
 
   // 使用的阈值倍率（默认 2.0，即 mean + 2σ）。
   double threshold_multiplier = 2.0;
+
+  // 实际瓶颈阈值，单位毫秒。
+  double threshold_ms = 0.0;
 };
 
 // 瓶颈检测器。

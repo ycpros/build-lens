@@ -18,7 +18,7 @@ QJsonDocument AnalysisReport::ToJsonDocument() const {
   QJsonObject root;
 
   // 元信息。
-  root["version"] = "0.2.0";
+  root["version"] = "0.3.0";
   root["totalFileCount"] = total_file_count;
   root["totalBuildTimeSeconds"] = total_build_time_s;
 
@@ -29,6 +29,7 @@ QJsonDocument AnalysisReport::ToJsonDocument() const {
   root["criticalPath"] = CriticalPathToJson();
   root["hotspotsByName"] = HotspotsToJson(hotspots_by_name);
   root["hotspotsByCategory"] = HotspotsToJson(hotspots_by_category);
+  root["sourceHotspots"] = HotspotsToJson(source_hotspots);
   root["bottlenecks"] = BottlenecksToJson();
 
   return QJsonDocument(root);
@@ -67,8 +68,12 @@ QJsonObject AnalysisReport::CriticalPathToJson() const {
   for (const CriticalPathItem& item : critical_path.path) {
     QJsonObject path_item;
     path_item["name"] = item.name;
-    path_item["durationUs"] = item.duration_us;
-    path_item["percentage"] = item.percentage;
+    path_item["inclusiveDurationUs"] = item.inclusive_duration_us;
+    path_item["exclusiveDurationUs"] = item.exclusive_duration_us;
+    path_item["percentageOfRoot"] = item.percentage_of_root;
+    if (!item.detail.isEmpty()) {
+      path_item["detail"] = item.detail;
+    }
     if (item.merged_depth > 1) {
       path_item["mergedDepth"] = item.merged_depth;
     }
@@ -77,6 +82,12 @@ QJsonObject AnalysisReport::CriticalPathToJson() const {
 
   obj["path"] = path_arr;
   obj["totalDurationUs"] = critical_path.total_duration_us;
+  if (!critical_path.source_file.isEmpty()) {
+    obj["sourceFile"] = critical_path.source_file;
+  }
+  if (!critical_path.source_path.isEmpty()) {
+    obj["sourcePath"] = critical_path.source_path;
+  }
   return obj;
 }
 
@@ -88,14 +99,15 @@ QJsonObject AnalysisReport::HotspotsToJson(
   for (const HotspotItem& item : hr.hotspots) {
     QJsonObject hi;
     hi["key"] = item.key;
-    hi["totalDurationUs"] = item.total_duration_us;
+    hi["durationUs"] = item.duration_us;
     hi["occurrenceCount"] = item.occurrence_count;
     hi["percentage"] = item.percentage;
     arr.append(hi);
   }
 
   obj["hotspots"] = arr;
-  obj["grandTotalUs"] = hr.grand_total_us;
+  obj["metric"] = hr.metric;
+  obj["grandTotalDurationUs"] = hr.grand_total_duration_us;
   return obj;
 }
 
@@ -115,5 +127,6 @@ QJsonObject AnalysisReport::BottlenecksToJson() const {
   obj["meanMs"] = bottlenecks.mean_ms;
   obj["stddevMs"] = bottlenecks.stddev_ms;
   obj["thresholdMultiplier"] = bottlenecks.threshold_multiplier;
+  obj["thresholdMs"] = bottlenecks.threshold_ms;
   return obj;
 }

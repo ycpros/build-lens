@@ -24,6 +24,9 @@ struct TraceEvent {
   // 对应 JSON 的 "cat" 字段；Clang 实际使用 "cat" 而非 "ph" 的类别语义。
   QString category;
 
+  // 事件细节，例如 Source 事件中的头文件路径，或解析事件中的 args.detail。
+  QString detail;
+
   // 事件阶段类型，通常为 "X"（Complete Event）。
   // "X" 表示有开始和持续时间的事件。
   QString phase;
@@ -39,6 +42,10 @@ struct TraceEvent {
 
   // 线程 ID，多线程编译时区分不同编译线程。
   int tid = 0;
+
+  // Clang 自带的 "Total ..." 汇总事件。默认分析会排除这类事件，
+  // 避免和真实时间线事件重复计数。
+  bool is_summary = false;
 };
 
 #endif  // BUILD_LENS_TRACEEVENT_H_

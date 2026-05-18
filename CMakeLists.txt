@@ -4,7 +4,7 @@
 # ============================================================
 
 cmake_minimum_required(VERSION 3.16)
-project(BuildLens VERSION 0.2.0 LANGUAGES CXX)
+project(BuildLens VERSION 0.3.0 LANGUAGES CXX)
 
 # ----- 编译标准 -----
 # 使用 C++17。
@@ -49,6 +49,10 @@ set(BUILDLENS_CORE_SOURCES
     # v0.2 新增 — 报告结构
     src/core/AnalysisReport.h
     src/core/AnalysisReport.cpp
+
+    # v0.4 新增 — 统一分析管线
+    src/core/AnalysisPipeline.h
+    src/core/AnalysisPipeline.cpp
 )
 
 # ============================================================
@@ -82,3 +86,29 @@ add_executable(BuildLensCLI
 
 target_include_directories(BuildLensCLI PRIVATE src)
 target_link_libraries(BuildLensCLI Qt6::Core)
+
+# ============================================================
+# 目标 3：BuildLensCoreTests（核心语义测试）
+# ============================================================
+enable_testing()
+
+add_executable(BuildLensCoreTests
+    tests/core_tests.cpp
+
+    ${BUILDLENS_CORE_SOURCES}
+)
+
+target_include_directories(BuildLensCoreTests PRIVATE src)
+target_link_libraries(BuildLensCoreTests Qt6::Core)
+target_compile_definitions(BuildLensCoreTests PRIVATE
+    BUILDLENS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+add_test(NAME BuildLensCoreTests COMMAND BuildLensCoreTests)
+
+add_test(
+    NAME BuildLensCLIFixtureSmoke
+    COMMAND BuildLensCLI
+            --input "${CMAKE_SOURCE_DIR}/resources/BuildLensSample/src"
+            --output "${CMAKE_BINARY_DIR}/buildlens-v0.3-fixture.json"
+)

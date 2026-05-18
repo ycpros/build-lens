@@ -46,6 +46,7 @@ BottleneckResult BottleneckDetector::Detect(
   }
   double stddev = std::sqrt(variance_sum / static_cast<double>(durations.size()));
   result.stddev_ms = stddev;
+  result.threshold_ms = mean + threshold_sigma * stddev;
 
   // 如果标准差为 0（所有文件耗时相同），阈值无效。
   if (stddev < 0.001) {
@@ -53,10 +54,8 @@ BottleneckResult BottleneckDetector::Detect(
   }
 
   // ── 检测异常 ──
-  double threshold = mean + threshold_sigma * stddev;
-
   for (const TraceRecord& rec : records) {
-    if (rec.total_duration_ms > threshold) {
+    if (rec.total_duration_ms > result.threshold_ms) {
       BottleneckItem item;
       item.name = rec.filename;
       item.duration_ms = rec.total_duration_ms;

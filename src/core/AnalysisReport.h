@@ -53,6 +53,7 @@ struct AnalysisReport {
   CriticalPathResult critical_path;
   HotspotResult hotspots_by_name;
   HotspotResult hotspots_by_category;
+  HotspotResult source_hotspots;
   BottleneckResult bottlenecks;
 
   // 分析包含的总文件数。

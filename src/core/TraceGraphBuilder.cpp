@@ -12,7 +12,32 @@
 
 #include <algorithm>
 #include <map>
-#include <stack>
+
+namespace {
+
+bool Contains(const TraceNode& parent, const TraceNode& child) {
+  return parent.start_us <= child.start_us && parent.end_us >= child.end_us;
+}
+
+double ClippedChildDuration(const TraceNode& parent, const TraceNode& child) {
+  const double start = std::max(parent.start_us, child.start_us);
+  const double end = std::min(parent.end_us, child.end_us);
+  return std::max(0.0, end - start);
+}
+
+void ComputeExclusiveDuration(TraceNode& node) {
+  double child_duration_sum = 0.0;
+  for (TraceNode& child : node.children) {
+    ComputeExclusiveDuration(child);
+    child_duration_sum += ClippedChildDuration(node, child);
+  }
+
+  node.exclusive_duration_us = node.duration_us - child_duration_sum;
+  node.exclusive_duration_us =
+      std::max(0.0, std::min(node.duration_us, node.exclusive_duration_us));
+}
+
+}  // namespace
 
 // static
 CompileGraph TraceGraphBuilder::Build(
@@ -37,6 +62,9 @@ CompileGraph TraceGraphBuilder::Build(
   // key = "pid:tic"，value = 该线程的事件列表。
   std::map<QString, std::vector<TraceEvent>> thread_groups;
   for (const TraceEvent& ev : events) {
+    if (ev.is_summary || ev.dur <= 0.0 || ev.name.isEmpty()) {
+      continue;
+    }
     QString key = QStringLiteral("%1:%2")
                       .arg(ev.pid)
                       .arg(ev.tid);
@@ -48,10 +76,14 @@ CompileGraph TraceGraphBuilder::Build(
     // 确保同一线程内按 ts 排序。
     std::sort(pair.second.begin(), pair.second.end(),
               [](const TraceEvent& a, const TraceEvent& b) {
-                return a.ts < b.ts;
+                if (a.ts != b.ts) return a.ts < b.ts;
+                return a.dur > b.dur;
               });
 
     auto roots = BuildThreadGraph(pair.second);
+    for (TraceNode& root : roots) {
+      ComputeExclusiveDuration(root);
+    }
     for (auto& root : roots) {
       graph.roots.push_back(std::move(root));
     }
@@ -67,7 +99,7 @@ std::vector<TraceNode> TraceGraphBuilder::BuildThreadGraph(
 
   // 栈保存当前开启但尚未结束的事件节点。
   // 栈顶 = 当前活跃的最深层事件。
-  std::stack<TraceNode*> node_stack;
+  std::vector<TraceNode*> node_stack;
 
   for (const TraceEvent& ev : thread_events) {
     // 跳过持续时间为 0 的事件（可能是瞬时事件）。
@@ -77,60 +109,26 @@ std::vector<TraceNode> TraceGraphBuilder::BuildThreadGraph(
     TraceNode node;
     node.name = ev.name;
     node.category = ev.category;
+    node.detail = ev.detail;
     node.start_us = ev.ts;
     node.end_us = ev.ts + ev.dur;
     node.duration_us = ev.dur;
     node.thread_id = ev.tid;
 
-    // 弹出已结束的节点：栈顶节点 end_us <= 当前事件 start_us。
-    // 这意味着栈顶节点在 当前事件开始之前就已经结束了。
-    while (!node_stack.empty() &&
-           node_stack.top()->end_us <= node.start_us) {
-      node_stack.pop();
+    // 弹出无法完整包含当前事件的节点。严格包含避免部分重叠被误建为父子。
+    while (!node_stack.empty() && !Contains(*node_stack.back(), node)) {
+      node_stack.pop_back();
     }
 
-    // ── 核心判断 ──
-    // 检查栈顶节点是否嵌套当前事件：
-    // 条件：栈顶 end_us >= 当前事件 end_us 且 start_us <= 当前事件 start_us
-    // 这意味着当前事件完全在栈顶节点的时间范围内。
-    bool nested = false;
     if (!node_stack.empty()) {
-      TraceNode* parent = node_stack.top();
-      if (parent->end_us >= node.end_us &&
-          parent->start_us <= node.start_us) {
-        parent->children.push_back(std::move(node));
-        // 新节点现在是栈中最深层的事件。
-        node_stack.push(&parent->children.back());
-        nested = true;
-      }
-    }
-
-    if (!nested) {
+      TraceNode* parent = node_stack.back();
+      parent->children.push_back(std::move(node));
+      node_stack.push_back(&parent->children.back());
+    } else {
       // 当前事件不在任何活跃节点内部，它是新的根节点
       //（对单线程编译，通常只有 ExecuteCompiler 会是根节点）。
       roots.push_back(std::move(node));
-      node_stack.push(&roots.back());
-    }
-  }
-
-  // 去重：如果存在多个根但其中某些实际是嵌套关系，合并之。
-  // （栈算法已保证正确性，此步骤仅处理极端边缘情况。）
-  if (roots.size() > 1) {
-    // 检查是否某个根是另一个根的父节点（按时间包含关系）。
-    for (size_t i = 0; i < roots.size(); ++i) {
-      for (size_t j = 0; j < roots.size(); ++j) {
-        if (i != j &&
-            roots[i].start_us <= roots[j].start_us &&
-            roots[i].end_us >= roots[j].end_us) {
-          // roots[i] 包含了 roots[j]，将 roots[j] 移入 roots[i] 的子节点。
-          roots[i].children.push_back(std::move(roots[j]));
-          roots.erase(roots.begin() + static_cast<long long>(j));
-          // 调整索引。
-          if (j < i) --i;
-          --j;
-          if (roots.size() <= 1) break;
-        }
-      }
+      node_stack.push_back(&roots.back());
     }
   }
 

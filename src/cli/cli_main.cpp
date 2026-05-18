@@ -13,24 +13,20 @@
 #include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QFile>
-#include <QFileInfo>
 #include <QTextStream>
+
+#include <algorithm>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
 
-#include "core/AnalysisReport.h"
-#include "core/BottleneckDetector.h"
-#include "core/CriticalPathAnalyzer.h"
-#include "core/HotspotAnalyzer.h"
-#include "core/TraceGraphBuilder.h"
-#include "core/TraceParser.h"
+#include "core/AnalysisPipeline.h"
 
 int main(int argc, char* argv[]) {
   QCoreApplication app(argc, argv);
   QCoreApplication::setApplicationName("BuildLens CLI");
-  QCoreApplication::setApplicationVersion("0.2.0");
+  QCoreApplication::setApplicationVersion("0.3.0");
 
   // Windows 控制台默认 GBK，SetConsoleOutputCP(CP_UTF8) 修复中文乱码。
 #ifdef Q_OS_WIN
@@ -87,81 +83,29 @@ int main(int argc, char* argv[]) {
   if (threshold <= 0.0) threshold = 2.0;
   if (top_n <= 0) top_n = 10;
 
-  // ----- 阶段 1：解析 -----
+  // ----- 执行分析管线 -----
   QTextStream progress(stderr);
-  progress << "[1/4] 解析 trace 文件..." << Qt::endl;
+  progress << "[1/3] 执行分析管线..." << Qt::endl;
 
-  std::vector<FileTraceResult> file_results;
-  std::vector<TraceRecord> records;
+  AnalysisOptions options;
+  options.threshold_sigma = threshold;
+  options.top_n = top_n;
 
-  QFileInfo input_info(input_path);
-  if (input_info.isDir()) {
-    file_results = TraceParser::ParseDirectoryEvents(input_path);
-    records = TraceParser::ParseDirectory(input_path);
-  } else {
-    // 单个文件。
-    FileTraceResult single = TraceParser::ParseFileEvents(input_path);
-    if (!single.events.empty()) {
-      file_results.push_back(single);
-    }
-    records.push_back(TraceParser::ParseFile(input_path));
+  AnalysisRunResult run_result = AnalysisPipeline::Run(input_path, options);
+  for (const QString& warning : run_result.warnings) {
+    progress << "警告：" << warning << "\n";
   }
 
-  if (file_results.empty()) {
-    progress << "警告：未找到有效的 -ftime-trace JSON 文件。\n";
+  if (!run_result.has_data) {
     return 0;
   }
 
-  progress << "  解析完成：" << file_results.size()
-           << " 个源文件，共 " << records.size() << " 条记录\n";
-
-  // ----- 阶段 2：构建调用图 + 分析 -----
-  progress << "[2/4] 构建调用图并执行分析..." << Qt::endl;
-
-  AnalysisReport report;
-  report.total_file_count = static_cast<int>(file_results.size());
-
-  // 文件摘要。
-  for (const FileTraceResult& fr : file_results) {
-    FileSummary fs;
-    fs.filename = fr.filename;
-    fs.source_path = fr.source_path;
-    fs.event_count = static_cast<int>(fr.events.size());
-    // 查找对应 TraceRecord 的总耗时。
-    for (const TraceRecord& rec : records) {
-      if (rec.source_path == fr.source_path) {
-        fs.total_duration_ms = rec.total_duration_ms;
-        report.total_build_time_s += rec.total_duration_ms / 1000.0;
-        break;
-      }
-    }
-    report.files.push_back(fs);
-
-    // 对每个文件构建调用图并分析关键路径。
-    CompileGraph graph = TraceGraphBuilder::Build(fr.source_path, fr.events);
-    CriticalPathResult cp = CriticalPathAnalyzer::Analyze(graph);
-    // 保留最长的关键路径（跨文件）。
-    if (cp.total_duration_us > report.critical_path.total_duration_us) {
-      report.critical_path = std::move(cp);
-    }
-  }
-
-  // 热点分析（跨文件聚合）。
-  progress << "[3/4] 热点分析..." << Qt::endl;
-  report.hotspots_by_name =
-      HotspotAnalyzer::Analyze(file_results,
-                               HotspotAnalyzer::Dimension::kByName,
-                               top_n);
-  report.hotspots_by_category =
-      HotspotAnalyzer::Analyze(file_results,
-                               HotspotAnalyzer::Dimension::kByCategory,
-                               top_n);
-
-  // 瓶颈检测。
-  progress << "[4/4] 瓶颈检测..." << Qt::endl;
-  report.bottlenecks = BottleneckDetector::Detect(records, threshold);
+  const AnalysisReport& report = run_result.report;
+  progress << "  解析完成：" << report.total_file_count
+           << " 个源文件\n";
 
   // ----- 输出 -----
+  progress << "[2/3] 输出报告..." << Qt::endl;
   QString json_output = report.ToJsonString();
 
   if (!output_path.isEmpty()) {
@@ -180,16 +124,37 @@ int main(int argc, char* argv[]) {
     out << json_output << Qt::endl;
   }
 
+  progress << "[3/3] 汇总结果..." << Qt::endl;
   progress << "分析完成。\n"
            << "  文件数：" << report.total_file_count << "\n"
            << "  总编译耗时：" << report.total_build_time_s << " s\n"
-           << "  热点（按名称）Top-3：";
+           << "  最慢文件 Top-3：";
   for (int i = 0; i < std::min(3, static_cast<int>(
-      report.hotspots_by_name.hotspots.size())); ++i) {
+      report.files.size())); ++i) {
     if (i > 0) progress << ", ";
-    progress << report.hotspots_by_name.hotspots[i].key
+    progress << report.files[i].filename
              << "("
-             << static_cast<int>(report.hotspots_by_name.hotspots[i].percentage)
+             << report.files[i].total_duration_ms / 1000.0
+             << "s)";
+  }
+  progress << "\n"
+           << "  热点类别 Top-3：";
+  for (int i = 0; i < std::min(3, static_cast<int>(
+      report.hotspots_by_category.hotspots.size())); ++i) {
+    if (i > 0) progress << ", ";
+    progress << report.hotspots_by_category.hotspots[i].key
+             << "("
+             << static_cast<int>(report.hotspots_by_category.hotspots[i].percentage)
+             << "%)";
+  }
+  progress << "\n"
+           << "  Source 热点 Top-3：";
+  for (int i = 0; i < std::min(3, static_cast<int>(
+      report.source_hotspots.hotspots.size())); ++i) {
+    if (i > 0) progress << ", ";
+    progress << report.source_hotspots.hotspots[i].key
+             << "("
+             << static_cast<int>(report.source_hotspots.hotspots[i].percentage)
              << "%)";
   }
   progress << "\n";
