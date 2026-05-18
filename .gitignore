@@ -16,6 +16,7 @@ out/
 moc_*.cpp
 qrc_*.cpp
 ui_*.h
+*_autogen/
 *.pro.user
 object_script.*.*
 

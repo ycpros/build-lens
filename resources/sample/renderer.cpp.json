@@ -1,9 +1,16 @@
 {
   "traceEvents": [
-    {"cat": "phase", "name": "Parse", "dur": 5200},
-    {"cat": "phase", "name": "Instantiate", "dur": 18400},
-    {"cat": "phase", "name": "Optimize", "dur": 8900},
-    {"cat": "phase", "name": "CodeGen", "dur": 5700},
-    {"cat": "phase", "name": "Total", "dur": 38200}
+    {"name": "ExecuteCompiler", "cat": "driver",    "ph": "X", "ts": 0,    "dur": 38200, "pid": 1, "tid": 1},
+    {"name": "ParseAST",        "cat": "parse",     "ph": "X", "ts": 0,    "dur": 15200, "pid": 1, "tid": 1},
+    {"name": "ParseDecl",       "cat": "parse",     "ph": "X", "ts": 0,    "dur": 5200,  "pid": 1, "tid": 1},
+    {"name": "ParseTemplate",   "cat": "parse",     "ph": "X", "ts": 5200, "dur": 4800,  "pid": 1, "tid": 1},
+    {"name": "ParseStmt",       "cat": "parse",     "ph": "X", "ts": 10000,"dur": 5200,  "pid": 1, "tid": 1},
+    {"name": "InstantiateFunc", "cat": "inst",      "ph": "X", "ts": 15200,"dur": 8400,  "pid": 1, "tid": 1},
+    {"name": "DeduceTemplate",  "cat": "inst",      "ph": "X", "ts": 15200,"dur": 3200,  "pid": 1, "tid": 1},
+    {"name": "SpecializeFunc",  "cat": "inst",      "ph": "X", "ts": 18400,"dur": 5200,  "pid": 1, "tid": 1},
+    {"name": "CodeGenFunction", "cat": "codegen",   "ph": "X", "ts": 23600,"dur": 8900,  "pid": 1, "tid": 1},
+    {"name": "EmitAssembly",    "cat": "codegen",   "ph": "X", "ts": 23600,"dur": 3400,  "pid": 1, "tid": 1},
+    {"name": "OptimizeModule",  "cat": "codegen",   "ph": "X", "ts": 27000,"dur": 5500,  "pid": 1, "tid": 1},
+    {"name": "LinkModule",      "cat": "driver",    "ph": "X", "ts": 32500,"dur": 5700,  "pid": 1, "tid": 1}
   ]
 }

@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
 
   // 设置应用元信息，影响 QSettings 存储路径等。
   QApplication::setApplicationName(QStringLiteral("BuildLens"));
-  QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+  QApplication::setApplicationVersion(QStringLiteral("0.2.0"));
   QApplication::setOrganizationName(QStringLiteral("BuildLens"));
 
   MainWindow window;
