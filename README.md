@@ -1,41 +1,44 @@
+**English** | [中文](README_CN.md)
+
 # BuildLens 🔍
 
-**C++ 编译性能观测工具 — 从原始 trace 到可执行决策**
+**C++ Compilation Performance Observability — from raw traces to actionable decisions**
 
 [![license](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![cpp](https://img.shields.io/badge/C%2B%2B-17-00599C)](https://en.cppreference.com/w/cpp/17)
 [![qt](https://img.shields.io/badge/Qt-6.8-41CD52)](https://www.qt.io/)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)]()
 
-BuildLens 解析 Clang `-ftime-trace` 输出的 JSON（Chrome Trace Event 格式），
-重建编译调用树，执行三类分析，输出结构化 JSON 报告。
-不仅告诉你**哪个文件最慢**，还能回答**为什么慢，应该优化什么**。
+BuildLens parses Clang `-ftime-trace` JSON output (Chrome Trace Event format),
+reconstructs the compilation call tree, runs three categories of analysis, and emits
+a structured JSON report. It doesn't just tell you **which file is slowest** —
+it answers **why it's slow, and what to optimize**.
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### CLI（推荐）
+### CLI (Recommended)
 
 ```powershell
-# 用 Clang 编译你的项目（生成 -ftime-trace JSON）
+# Compile your project with Clang (generates -ftime-trace JSON)
 clang++ -ftime-trace -c your_code.cpp
 
-# 分析构建目录
+# Analyze a build directory
 .\BuildLensCLI.exe --input .\build-dir\ --output report.json
 
-# 或直接输出到 stdout
+# Or print directly to stdout
 .\BuildLensCLI.exe --input .\build-dir\
 ```
 
-### 桌面 GUI
+### Desktop GUI
 
 ```powershell
 .\BuildLens.exe
-# 文件 → 打开目录 → 选择包含 .json 的构建目录
+# File → Open Directory → choose a build directory containing .json files
 ```
 
-### 构建
+### Build
 
 ```bash
 cmake -B cmake-build-debug -DCMAKE_PREFIX_PATH="D:/Software/Qt6.8.3/6.8.3/msvc2022_64"
@@ -43,50 +46,52 @@ cmake --build cmake-build-debug
 ctest --test-dir cmake-build-debug --output-on-failure
 ```
 
-| 目标 | 依赖 | 产物 |
-|------|------|------|
-| `BuildLens` | Qt6::Widgets + Core | 桌面 GUI |
-| `BuildLensCLI` | Qt6::Core only | 命令行工具 |
-| `BuildLensCoreTests` | Qt6::Core only | 核心语义回归测试 |
+| Target | Dependencies | Artifact |
+|--------|-------------|----------|
+| `BuildLens` | Qt6::Widgets + Core | Desktop GUI |
+| `BuildLensCLI` | Qt6::Core only | CLI tool |
+| `BuildLensCoreTests` | Qt6::Core only | Core semantic regression tests |
 
 ---
 
-## 📊 三类分析器
+## 📊 Three Analyzers
 
 ```
    Clang -ftime-trace JSON
            │
            ▼
-   TraceParser ──── 解析全部事件（ph:"X" / ph:"b"/"e" 对）
+   TraceParser ──── parses all events (ph:"X" / ph:"b"/"e" pairs)
            │
            ▼
-   TraceGraphBuilder ── 栈算法 → 嵌套调用树
+   TraceGraphBuilder ── stack-based algorithm → nested call tree
            │
     ┌──────┼──────┐
     ▼      ▼      ▼
- 关键路径  热点    瓶颈
+Critical  Hotspot  Bottleneck
+  Path
 ```
 
-### 1. CriticalPathAnalyzer — "优化什么？"
+### 1. CriticalPathAnalyzer — "What to optimize?"
 
-使用墙钟语义：选择 inclusive 耗时最大的根节点，
-再逐层选择 inclusive 耗时最大的子节点。
-父子耗时不再相加，`totalDurationUs` 等于根节点真实耗时。
-报告同时输出 `inclusiveDurationUs`、`exclusiveDurationUs` 和 `percentageOfRoot`。
+Wall-clock semantics: picks the root node with the largest inclusive duration,
+then recursively picks the child with the largest inclusive duration at each level.
+Parent and child durations are not summed — `totalDurationUs` equals the root node's
+real wall-clock time. Reports `inclusiveDurationUs`, `exclusiveDurationUs`, and
+`percentageOfRoot` for each node on the path.
 
 ```
 ExecuteCompiler ─→ Frontend ─→ Source×13 ─→ ParseClass
 ```
 
-### 2. HotspotAnalyzer — "哪类事最花时间？"
+### 2. HotspotAnalyzer — "What category costs the most?"
 
-跨文件按事件名/类别聚合，默认使用 exclusive 耗时。
-Clang 自带的 `Total ...` 汇总事件会被过滤，避免重复计数。
-`sourceHotspots` 会把 `Source` 事件聚合到具体 header/source 路径。
+Aggregates by event name/category across all files, using exclusive duration by default.
+Clang's built-in `Total ...` summary events are filtered out to avoid double-counting.
+`sourceHotspots` aggregates `Source` events to specific header/source paths.
 
 ```
 hotspotsByCategory:
-  source       46%  ← #include / header 处理
+  source       46%  ← #include / header processing
   parse        32%
   instantiate  10%
 
@@ -95,30 +100,31 @@ sourceHotspots:
   D:/Software/Qt6.8.3/.../QtCore/qnamespace.h
 ```
 
-### 3. BottleneckDetector — "哪个文件不正常？"
+### 3. BottleneckDetector — "Which files are outliers?"
 
-统计均值 μ + 标准差 σ，超出 μ + 2σ 的文件标记为瓶颈。
-
----
-
-## ⚠️ v0.2 → v0.3 兼容性
-
-v0.3 的 CLI JSON 报告有破坏性 schema 变化：
-
-- `criticalPath.path[]` 不再输出旧的 `durationUs` / `percentage`，改为
-  `inclusiveDurationUs`、`exclusiveDurationUs`、`percentageOfRoot`。
-- `criticalPath.totalDurationUs` 现在等于根节点墙钟耗时，不再把父子耗时相加。
-- 热点默认使用 exclusive 耗时，结果带 `metric: "exclusiveDurationUs"`。
-- 热点项使用 `durationUs`，不再输出旧的 `totalDurationUs`。
-- Clang `Total ...` 汇总事件会被过滤，避免重复计数。
-- 新增 `sourceHotspots`，按具体 header/source 路径聚合 `Source` 事件。
-- `bottlenecks` 新增 `thresholdMs`。
-
-桌面 GUI 仍是文件耗时表格；v0.3 深度分析以 `BuildLensCLI` JSON 报告为准。
+Computes mean μ and standard deviation σ; files exceeding μ + 2σ are flagged as bottlenecks.
 
 ---
 
-## 📁 项目结构
+## ⚠️ v0.2 → v0.3 Compatibility
+
+v0.3 introduces breaking schema changes to the CLI JSON report:
+
+- `criticalPath.path[]` no longer outputs the old `durationUs` / `percentage`; replaced by
+  `inclusiveDurationUs`, `exclusiveDurationUs`, `percentageOfRoot`.
+- `criticalPath.totalDurationUs` now equals root node wall-clock time instead of summing parent+child.
+- Hotspots use exclusive duration by default, tagged with `metric: "exclusiveDurationUs"`.
+- Hotspot items use `durationUs`; the old `totalDurationUs` is removed.
+- Clang `Total ...` summary events are filtered to avoid double-counting.
+- New `sourceHotspots` section aggregates `Source` events by specific header/source path.
+- `bottlenecks` now includes `thresholdMs`.
+
+The desktop GUI remains a file-duration table. In-depth v0.3 analysis is driven by
+the `BuildLensCLI` JSON report.
+
+---
+
+## 📁 Project Structure
 
 ```
 build-lens/
@@ -126,40 +132,40 @@ build-lens/
 ├── CHANGELOG.md
 ├── README.md
 ├── resources/
-│   ├── sample/                    # 简化示例 -ftime-trace JSON
-│   └── BuildLensSample/src/       # 真实 Clang fixture trace
+│   ├── sample/                    # Simplified example -ftime-trace JSON
+│   └── BuildLensSample/src/       # Real Clang fixture traces
 └── src/
-    ├── main.cpp                   # GUI 入口
+    ├── main.cpp                   # GUI entry point
     ├── cli/
-    │   └── cli_main.cpp           # CLI 入口
-    ├── core/                      # 数据层（无 UI 依赖）
-    │   ├── TraceEvent.h           # 事件数据结构
-    │   ├── TraceRecord.h          # 总耗时记录
-    │   ├── TraceParser.h/.cpp     # JSON 解析器
-    │   ├── TraceGraph.h           # 调用图数据结构
-    │   ├── TraceGraphBuilder.h/.cpp  # 栈算法构建调用树
-    │   ├── CriticalPathAnalyzer.h/.cpp # DFS 最长路径
-    │   ├── HotspotAnalyzer.h/.cpp     # 热点聚合
-    │   ├── BottleneckDetector.h/.cpp  # 异常检测
-    │   └── AnalysisReport.h/.cpp      # 统一 JSON 报告
+    │   └── cli_main.cpp           # CLI entry point
+    ├── core/                      # Data layer (no UI dependency)
+    │   ├── TraceEvent.h           # Event data structures
+    │   ├── TraceRecord.h          # Total-duration records
+    │   ├── TraceParser.h/.cpp     # JSON parser
+    │   ├── TraceGraph.h           # Call graph data structures
+    │   ├── TraceGraphBuilder.h/.cpp  # Stack-based call tree construction
+    │   ├── CriticalPathAnalyzer.h/.cpp # DFS longest path
+    │   ├── HotspotAnalyzer.h/.cpp     # Hotspot aggregation
+    │   ├── BottleneckDetector.h/.cpp  # Anomaly detection
+    │   └── AnalysisReport.h/.cpp      # Unified JSON report
     ├── model/                     # Qt Model/View
     │   └── TraceTableModel.h/.cpp
     └── ui/                        # Qt GUI
         └── MainWindow.h/.cpp
 └── tests/
-    └── core_tests.cpp             # 核心语义与真实 trace 回归测试
+    └── core_tests.cpp             # Core semantic + real-trace regression tests
 ```
 
 ---
 
-## 🗺 路线图
+## 🗺 Roadmap
 
 ```
-v0.1 ✅ 桌面 GUI — 表格 + 搜索过滤
-v0.2 ✅ CLI + 三分析器管线 — 关键路径/热点/瓶颈 + JSON 报告
-v0.3 ✅ 语义修正 — 独占耗时、Total 过滤、Source/header 热点
-v0.4 ⏳ CI/CD 集成 — 多 session 对比、构建回归检测
-v1.0 ⏳ Web Dashboard — 团队协作、AI 优化建议
+v0.1 ✅ Desktop GUI — sortable/filterable table
+v0.2 ✅ CLI + three-analyzer pipeline — critical path/hotspot/bottleneck + JSON report
+v0.3 ✅ Semantic fixes — exclusive duration, Total filtering, source/header hotspots
+v0.4 ⏳ CI/CD integration — multi-session comparison, build regression detection
+v1.0 ⏳ Web Dashboard — team collaboration, AI optimization suggestions
 ```
 
 ---

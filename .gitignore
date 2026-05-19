@@ -2,7 +2,7 @@
 build/
 cmake-build-*/
 out/
-release/
+package/
 *.exe
 
 # ---------- 编译中间文件 ----------
