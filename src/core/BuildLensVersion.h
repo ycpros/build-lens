@@ -10,8 +10,8 @@
 
 namespace buildlens {
 
-inline constexpr const char* kApplicationVersion = "0.4.0";
-inline constexpr const char* kReportSchemaVersion = "0.4.0";
+inline constexpr const char* kApplicationVersion = "0.5.0";
+inline constexpr const char* kReportSchemaVersion = "0.5.0";
 
 }  // namespace buildlens
 

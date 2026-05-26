@@ -21,6 +21,13 @@
 #include "core/FileSummary.h"
 #include "core/HotspotAnalyzer.h"
 
+// 单个文件的分析结果，用于 GUI 逐文件展示。
+struct PerFileAnalysis {
+  QString source_file;
+  QString source_path;
+  CriticalPathResult critical_path;
+};
+
 // 统一分析报告。
 //
 // 包含一次分析运行的所有输出：
@@ -48,6 +55,9 @@ struct AnalysisReport {
   HotspotResult hotspots_by_category;
   HotspotResult source_hotspots;
   BottleneckResult bottlenecks;
+
+  // v0.5: 逐文件分析结果，与 files 一一对应。
+  std::vector<PerFileAnalysis> per_file_analyses;
 
   // 分析包含的总文件数。
   int total_file_count = 0;

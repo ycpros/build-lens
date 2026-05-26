@@ -1,9 +1,8 @@
-﻿// ============================================================
+// ============================================================
 // BuildLens — C++ 编译性能观测工具
 //
 // MainWindow.h
-// 功能：应用程序主窗口，包含菜单栏、文件选择、表格展示、
-//       搜索过滤和状态栏信息。
+// 功能：应用程序主窗口，包含菜单栏、文件表、分析面板和状态栏。
 // ============================================================
 
 #ifndef BUILD_LENS_MAINWINDOW_H_
@@ -12,19 +11,18 @@
 #include <QMainWindow>
 #include <memory>
 
+#include "core/AnalysisPipeline.h"
+
+class BottleneckPanel;
+class CriticalPathPanel;
+class HotspotPanel;
 class QLineEdit;
 class QSortFilterProxyModel;
-class QStatusBar;
+class QSplitter;
+class QTabWidget;
 class QTableView;
 class TraceTableModel;
 
-// BuildLens 主窗口。
-//
-// 布局：
-//   - 菜单栏：File → Open Directory 打开编译输出目录
-//   - 工具栏区：搜索框（按文件名实时过滤）
-//   - 中央区域：QTableView 展示编译耗时列表
-//   - 状态栏：文件总数、总耗时、平均耗时
 class MainWindow : public QMainWindow {
   Q_OBJECT
 
@@ -33,26 +31,33 @@ class MainWindow : public QMainWindow {
   ~MainWindow() override = default;
 
  private slots:
-  // 弹出目录选择对话框并加载 -ftime-trace 数据。
   void OnOpenDirectory();
-
-  // 搜索框文本变化时触发过滤。
   void OnFilterChanged(const QString& text);
+  void OnFileSelectionChanged(const QModelIndex& current,
+                              const QModelIndex& previous);
 
  private:
-  // 加载指定目录下的 -ftime-trace JSON 数据并更新界面。
   void LoadDirectory(const QString& dir_path);
-
-  // 更新状态栏：文件数、总耗时、平均耗时。
   void UpdateStatusBar();
+  void UpdateDetailPanels(int source_row);
 
   // ----- UI 组件 -----
   QTableView* table_view_;
   QLineEdit* filter_input_;
+  QSplitter* splitter_;
+  QTabWidget* tab_widget_;
+
+  // ----- 分析面板 -----
+  CriticalPathPanel* critical_path_panel_;
+  HotspotPanel* hotspot_panel_;
+  BottleneckPanel* bottleneck_panel_;
 
   // ----- 数据模型 -----
   TraceTableModel* model_;
   QSortFilterProxyModel* proxy_model_;
+
+  // ----- 当前分析结果 -----
+  AnalysisRunResult current_run_;
 };
 
 #endif  // BUILD_LENS_MAINWINDOW_H_

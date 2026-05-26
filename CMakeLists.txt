@@ -4,7 +4,7 @@
 # ============================================================
 
 cmake_minimum_required(VERSION 3.16)
-project(BuildLens VERSION 0.4.0 LANGUAGES CXX)
+project(BuildLens VERSION 0.5.0 LANGUAGES CXX)
 
 # ----- 编译标准 -----
 # 使用 C++17。
@@ -73,6 +73,12 @@ add_executable(BuildLens
     # ui — 界面层
     src/ui/MainWindow.h
     src/ui/MainWindow.cpp
+    src/ui/CriticalPathPanel.h
+    src/ui/CriticalPathPanel.cpp
+    src/ui/HotspotPanel.h
+    src/ui/HotspotPanel.cpp
+    src/ui/BottleneckPanel.h
+    src/ui/BottleneckPanel.cpp
 )
 
 target_include_directories(BuildLens PRIVATE src)
@@ -113,5 +119,5 @@ add_test(
     NAME BuildLensCLIFixtureSmoke
     COMMAND BuildLensCLI
             --input "${CMAKE_SOURCE_DIR}/resources/BuildLensSample/src"
-            --output "${CMAKE_BINARY_DIR}/buildlens-v0.4-fixture.json"
+            --output "${CMAKE_BINARY_DIR}/buildlens-v0.5-fixture.json"
 )

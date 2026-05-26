@@ -40,9 +40,14 @@ int main(int argc, char* argv[]) {
   QCommandLineParser parser;
   parser.setApplicationDescription(
       "BuildLens — C++ 编译性能分析工具 (CLI)\n"
-      "解析 Clang -ftime-trace JSON 并输出结构化分析报告。");
+      "解析 Clang -ftime-trace JSON 并输出结构化分析报告。\n"
+      "输出格式：JSON（v0.5 schema）。");
   parser.addHelpOption();
-  parser.addVersionOption();
+
+  QCommandLineOption versionOption(
+      QStringList() << "V" << "version",
+      "显示版本信息。");
+  parser.addOption(versionOption);
 
   QCommandLineOption inputOption(
       QStringList() << "i" << "input",
@@ -68,7 +73,21 @@ int main(int argc, char* argv[]) {
       "n", "10");
   parser.addOption(hotspotTopOption);
 
+  QCommandLineOption quietOption(
+      QStringList() << "q" << "quiet",
+      "静默模式，仅输出错误信息到 stderr。");
+  parser.addOption(quietOption);
+
   parser.process(app);
+
+  if (parser.isSet(versionOption)) {
+    QTextStream out(stdout);
+    out << "BuildLens CLI "
+        << QString::fromLatin1(buildlens::kApplicationVersion) << "\n";
+    return 0;
+  }
+
+  const bool quiet = parser.isSet(quietOption);
 
   if (!parser.isSet(inputOption)) {
     QTextStream err(stderr);
@@ -87,7 +106,10 @@ int main(int argc, char* argv[]) {
 
   // ----- 执行分析管线 -----
   QTextStream progress(stderr);
-  progress << "[1/3] 执行分析管线..." << Qt::endl;
+  QTextStream err(stderr);
+  if (!quiet) {
+    progress << "[1/3] 执行分析管线..." << Qt::endl;
+  }
 
   AnalysisOptions options;
   options.threshold_sigma = threshold;
@@ -95,7 +117,7 @@ int main(int argc, char* argv[]) {
 
   AnalysisRunResult run_result = AnalysisPipeline::Run(input_path, options);
   for (const QString& warning : run_result.warnings) {
-    progress << "警告：" << warning << "\n";
+    err << "警告：" << warning << "\n";
   }
 
   if (!run_result.has_data) {
@@ -103,11 +125,15 @@ int main(int argc, char* argv[]) {
   }
 
   const AnalysisReport& report = run_result.report;
-  progress << "  解析完成：" << report.total_file_count
-           << " 个源文件\n";
+  if (!quiet) {
+    progress << "  解析完成：" << report.total_file_count
+             << " 个源文件\n";
+  }
 
   // ----- 输出 -----
-  progress << "[2/3] 输出报告..." << Qt::endl;
+  if (!quiet) {
+    progress << "[2/3] 输出报告..." << Qt::endl;
+  }
   QString json_output = report.ToJsonString();
 
   if (!output_path.isEmpty()) {
@@ -115,55 +141,58 @@ int main(int argc, char* argv[]) {
     if (out_file.open(QIODevice::WriteOnly | QIODevice::Text)) {
       out_file.write(json_output.toUtf8());
       out_file.close();
-      progress << "报告已写入：" << output_path << Qt::endl;
+      if (!quiet) {
+        progress << "报告已写入：" << output_path << Qt::endl;
+      }
     } else {
-      progress << "错误：无法写入文件 " << output_path << Qt::endl;
+      err << "错误：无法写入文件 " << output_path << Qt::endl;
       return 1;
     }
   } else {
-    // 输出到 stdout。
     QTextStream out(stdout);
     out << json_output << Qt::endl;
   }
 
-  progress << "[3/3] 汇总结果..." << Qt::endl;
-  progress << "分析完成。\n"
-           << "  文件数：" << report.total_file_count << "\n"
-           << "  总编译耗时：" << report.total_build_time_s << " s\n"
-           << "  最慢文件 Top-3：";
-  for (int i = 0; i < std::min(3, static_cast<int>(
-      report.files.size())); ++i) {
-    if (i > 0) progress << ", ";
-    progress << report.files[i].filename
-             << "("
-             << report.files[i].total_duration_ms / 1000.0
-             << "s)";
-  }
-  progress << "\n"
-           << "  热点类别 Top-3：";
-  for (int i = 0; i < std::min(3, static_cast<int>(
-      report.hotspots_by_category.hotspots.size())); ++i) {
-    if (i > 0) progress << ", ";
-    progress << report.hotspots_by_category.hotspots[i].key
-             << "("
-             << static_cast<int>(report.hotspots_by_category.hotspots[i].percentage)
-             << "%)";
-  }
-  progress << "\n"
-           << "  Source 热点 Top-3：";
-  for (int i = 0; i < std::min(3, static_cast<int>(
-      report.source_hotspots.hotspots.size())); ++i) {
-    if (i > 0) progress << ", ";
-    progress << report.source_hotspots.hotspots[i].key
-             << "("
-             << static_cast<int>(report.source_hotspots.hotspots[i].percentage)
-             << "%)";
-  }
-  progress << "\n";
+  if (!quiet) {
+    progress << "[3/3] 汇总结果..." << Qt::endl;
+    progress << "分析完成。\n"
+             << "  文件数：" << report.total_file_count << "\n"
+             << "  总编译耗时：" << report.total_build_time_s << " s\n"
+             << "  最慢文件 Top-3：";
+    for (int i = 0; i < std::min(3, static_cast<int>(
+        report.files.size())); ++i) {
+      if (i > 0) progress << ", ";
+      progress << report.files[i].filename
+               << "("
+               << report.files[i].total_duration_ms / 1000.0
+               << "s)";
+    }
+    progress << "\n"
+             << "  热点类别 Top-3：";
+    for (int i = 0; i < std::min(3, static_cast<int>(
+        report.hotspots_by_category.hotspots.size())); ++i) {
+      if (i > 0) progress << ", ";
+      progress << report.hotspots_by_category.hotspots[i].key
+               << "("
+               << static_cast<int>(report.hotspots_by_category.hotspots[i].percentage)
+               << "%)";
+    }
+    progress << "\n"
+             << "  Source 热点 Top-3：";
+    for (int i = 0; i < std::min(3, static_cast<int>(
+        report.source_hotspots.hotspots.size())); ++i) {
+      if (i > 0) progress << ", ";
+      progress << report.source_hotspots.hotspots[i].key
+               << "("
+               << static_cast<int>(report.source_hotspots.hotspots[i].percentage)
+               << "%)";
+    }
+    progress << "\n";
 
-  if (!report.bottlenecks.bottlenecks.empty()) {
-    progress << "  检测到 " << report.bottlenecks.bottlenecks.size()
-             << " 个瓶颈文件\n";
+    if (!report.bottlenecks.bottlenecks.empty()) {
+      progress << "  检测到 " << report.bottlenecks.bottlenecks.size()
+               << " 个瓶颈文件\n";
+    }
   }
 
   return 0;

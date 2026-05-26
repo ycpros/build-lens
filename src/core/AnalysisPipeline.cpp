@@ -135,12 +135,21 @@ AnalysisRunResult AnalysisPipeline::Run(
 
     CompileGraph graph = TraceGraphBuilder::Build(file.source_path,
                                                   file.events);
-    CriticalPathResult critical_path = CriticalPathAnalyzer::Analyze(graph);
-    if (critical_path.total_duration_us >
+    CriticalPathResult cp = CriticalPathAnalyzer::Analyze(graph);
+    cp.source_file = graph.source_name;
+    cp.source_path = graph.source_path;
+
+    // 保留逐文件关键路径。
+    PerFileAnalysis pfa;
+    pfa.source_file = graph.source_name;
+    pfa.source_path = graph.source_path;
+    pfa.critical_path = cp;
+    result.report.per_file_analyses.push_back(std::move(pfa));
+
+    // 更新全局关键路径（取最大）。
+    if (cp.total_duration_us >
         result.report.critical_path.total_duration_us) {
-      critical_path.source_file = graph.source_name;
-      critical_path.source_path = graph.source_path;
-      result.report.critical_path = std::move(critical_path);
+      result.report.critical_path = std::move(cp);
     }
     graphs.push_back(std::move(graph));
   }
