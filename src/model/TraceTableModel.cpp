@@ -30,9 +30,9 @@ QString FormatDuration(double ms) {
 TraceTableModel::TraceTableModel(QObject* parent)
     : QAbstractTableModel(parent) {}
 
-void TraceTableModel::SetRecords(const std::vector<TraceRecord>& records) {
+void TraceTableModel::SetFiles(const std::vector<FileSummary>& files) {
   beginResetModel();
-  records_ = records;
+  files_ = files;
   // 默认按耗时降序排列。
   sort(kColumnDurationMs, Qt::DescendingOrder);
   endResetModel();
@@ -42,7 +42,7 @@ void TraceTableModel::SetRecords(const std::vector<TraceRecord>& records) {
 
 int TraceTableModel::rowCount(const QModelIndex& parent) const {
   if (parent.isValid()) return 0;
-  return static_cast<int>(records_.size());
+  return static_cast<int>(files_.size());
 }
 
 int TraceTableModel::columnCount(const QModelIndex& parent) const {
@@ -52,20 +52,20 @@ int TraceTableModel::columnCount(const QModelIndex& parent) const {
 
 QVariant TraceTableModel::data(const QModelIndex& index, int role) const {
   if (!index.isValid()) return {};
-  if (index.row() < 0 || index.row() >= static_cast<int>(records_.size())) {
+  if (index.row() < 0 || index.row() >= static_cast<int>(files_.size())) {
     return {};
   }
 
-  const TraceRecord& record = records_[index.row()];
+  const FileSummary& file = files_[index.row()];
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case kColumnFilename:
-        return record.filename;
+        return file.filename;
       case kColumnDurationMs:
-        return FormatDuration(record.total_duration_ms);
+        return FormatDuration(file.total_duration_ms);
       case kColumnSourcePath:
-        return record.source_path;
+        return file.source_path;
       default:
         return {};
     }
@@ -100,23 +100,23 @@ QVariant TraceTableModel::headerData(int section,
 
 void TraceTableModel::sort(int column, Qt::SortOrder order) {
   // 按指定列排序，默认升序；耗时列特殊处理为数值比较。
-  std::sort(records_.begin(), records_.end(),
-            [column, order](const TraceRecord& a, const TraceRecord& b) {
-              bool less_than = false;
+  std::sort(files_.begin(), files_.end(),
+            [column, order](const FileSummary& a, const FileSummary& b) {
+              int compare = 0;
               switch (column) {
                 case kColumnFilename:
-                  less_than = a.filename.localeAwareCompare(b.filename) < 0;
+                  compare = a.filename.localeAwareCompare(b.filename);
                   break;
                 case kColumnDurationMs:
-                  less_than = a.total_duration_ms < b.total_duration_ms;
+                  if (a.total_duration_ms < b.total_duration_ms) compare = -1;
+                  if (a.total_duration_ms > b.total_duration_ms) compare = 1;
                   break;
                 case kColumnSourcePath:
-                  less_than =
-                      a.source_path.localeAwareCompare(b.source_path) < 0;
+                  compare = a.source_path.localeAwareCompare(b.source_path);
                   break;
                 default:
                   break;
               }
-              return (order == Qt::AscendingOrder) ? less_than : !less_than;
+              return (order == Qt::AscendingOrder) ? compare < 0 : compare > 0;
             });
 }

@@ -116,7 +116,8 @@ v0.3 的 CLI JSON 报告有破坏性 schema 变化：
 - 新增 `sourceHotspots`，按具体 header/source 路径聚合 `Source` 事件。
 - `bottlenecks` 新增 `thresholdMs`。
 
-桌面 GUI 仍是文件耗时表格；v0.3 深度分析以 `BuildLensCLI` JSON 报告为准。
+从 v0.4 开始，CLI 和桌面 GUI 共用 `AnalysisPipeline`。GUI 当前仍展示文件耗时表格，
+但数据来源已经切到统一报告管线，而不是旧的总耗时 parser 路径。
 
 ---
 
@@ -135,15 +136,17 @@ build-lens/
     ├── cli/
     │   └── cli_main.cpp           # CLI 入口
     ├── core/                      # 数据层（无 UI 依赖）
+    │   ├── BuildLensVersion.h     # 集中版本信息
+    │   ├── FileSummary.h          # 单文件分析摘要
     │   ├── TraceEvent.h           # 事件数据结构
-    │   ├── TraceRecord.h          # 总耗时记录
     │   ├── TraceParser.h/.cpp     # JSON 解析器
     │   ├── TraceGraph.h           # 调用图数据结构
     │   ├── TraceGraphBuilder.h/.cpp  # 栈算法构建调用树
     │   ├── CriticalPathAnalyzer.h/.cpp # DFS 最长路径
     │   ├── HotspotAnalyzer.h/.cpp     # 热点聚合
     │   ├── BottleneckDetector.h/.cpp  # 异常检测
-    │   └── AnalysisReport.h/.cpp      # 统一 JSON 报告
+    │   ├── AnalysisReport.h/.cpp      # 统一 JSON 报告
+    │   └── AnalysisPipeline.h/.cpp    # CLI/GUI 共享编排层
     ├── model/                     # Qt Model/View
     │   └── TraceTableModel.h/.cpp
     └── ui/                        # Qt GUI
@@ -160,7 +163,8 @@ build-lens/
 v0.1 ✅ 桌面 GUI — 表格 + 搜索过滤
 v0.2 ✅ CLI + 三分析器管线 — 关键路径/热点/瓶颈 + JSON 报告
 v0.3 ✅ 语义修正 — 独占耗时、Total 过滤、Source/header 热点
-v0.4 ⏳ CI/CD 集成 — 多 session 对比、构建回归检测
+v0.4 ✅ AnalysisPipeline — CLI/GUI 统一管线 + 遗留收敛
+v0.5 ⏳ CI/CD 集成 — 多 session 对比、构建回归检测
 v1.0 ⏳ Web Dashboard — 团队协作、AI 优化建议
 ```
 

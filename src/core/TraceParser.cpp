@@ -134,39 +134,6 @@ QString TraceParser::InferSourceName(const QString& json_path) {
 }
 
 // static
-double TraceParser::ExtractTotalDuration(const QJsonArray& events) {
-  // 真实 Clang 时间线事件：ph=="X" && name=="ExecuteCompiler"。
-  for (const QJsonValue& value : events) {
-    QJsonObject event = value.toObject();
-    if (event.value("ph").toString() == "X" &&
-        event.value("name").toString() == "ExecuteCompiler") {
-      return event.value("dur").toDouble(0.0);
-    }
-  }
-
-  // Clang 自带汇总事件。仅在没有真实 ExecuteCompiler 时回退使用。
-  for (const QJsonValue& value : events) {
-    QJsonObject event = value.toObject();
-    if (event.value("ph").toString() == "X" &&
-        event.value("name").toString() == "Total ExecuteCompiler") {
-      return event.value("dur").toDouble(0.0);
-    }
-  }
-
-  // 回退：示例数据格式 cat=="phase" && name=="Total"
-  for (const QJsonValue& value : events) {
-    QJsonObject event = value.toObject();
-    if (event.value("cat").toString() == "phase" &&
-        event.value("name").toString() == "Total") {
-      return event.value("dur").toDouble(0.0);
-    }
-  }
-  return 0.0;
-}
-
-// ----- v0.2 新增：解析全部事件 -----
-
-// static
 FileTraceResult TraceParser::ParseFileEvents(const QString& file_path) {
   FileTraceResult result;
   result.source_path = file_path;
@@ -275,69 +242,4 @@ std::vector<FileTraceResult> TraceParser::ParseDirectoryEvents(
   }
 
   return results;
-}
-
-// ----- v0.1 兼容接口（保持向后兼容）-----
-
-// static
-TraceRecord TraceParser::ParseFile(const QString& file_path) {
-  TraceRecord record;
-  record.source_path = file_path;
-  record.filename = InferSourceName(file_path);
-
-  QFile file(file_path);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    return record;
-  }
-
-  QByteArray content = file.readAll();
-  file.close();
-
-  QJsonParseError parse_error;
-  QJsonDocument doc = QJsonDocument::fromJson(content, &parse_error);
-  if (parse_error.error != QJsonParseError::NoError) {
-    return record;
-  }
-
-  QJsonObject root = doc.object();
-  QJsonArray events = root.value("traceEvents").toArray();
-
-  double total_us = ExtractTotalDuration(events);
-  record.total_duration_ms = total_us / 1000.0;
-
-  return record;
-}
-
-// static
-std::vector<TraceRecord> TraceParser::ParseDirectory(
-    const QString& dir_path) {
-  std::vector<TraceRecord> records;
-
-  QDir dir(dir_path);
-  if (!dir.exists()) {
-    return records;
-  }
-
-  QStringList json_files;
-  QDirIterator it(dir_path,
-                  {kJsonSuffix},
-                  QDir::Files,
-                  QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    it.next();
-    json_files << it.filePath();
-  }
-
-  std::sort(json_files.begin(), json_files.end(), [](const QString &a, const QString &b){
-      return QFileInfo(a).fileName() < QFileInfo(b).fileName();
-  });
-
-  for (const QString& full_path : json_files) {
-    TraceRecord record = ParseFile(full_path);
-    if (record.total_duration_ms > 0.0) {
-      records.push_back(record);
-    }
-  }
-
-  return records;
 }

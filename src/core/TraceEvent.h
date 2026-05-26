@@ -4,8 +4,7 @@
 // TraceEvent.h
 // 功能：定义单条编译 trace 事件的完整数据结构。
 //       对应 Clang -ftime-trace JSON 中 traceEvents 数组的每一项。
-//       相比 TraceRecord（v0.1 仅存总耗时），TraceEvent 保留
-//       事件的嵌套关系和时间范围，供 GraphBuilder 重建调用树。
+//       保留事件的嵌套关系和时间范围，供 GraphBuilder 重建调用树。
 // ============================================================
 
 #ifndef BUILD_LENS_TRACEEVENT_H_

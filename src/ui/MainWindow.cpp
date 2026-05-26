@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <numeric>
 
-#include "core/TraceParser.h"
+#include "core/AnalysisPipeline.h"
 #include "model/TraceTableModel.h"
 
 namespace {
@@ -122,19 +122,21 @@ void MainWindow::OnFilterChanged(const QString& text) {
 void MainWindow::LoadDirectory(const QString& dir_path) {
   QApplication::setOverrideCursor(Qt::WaitCursor);
 
-  std::vector<TraceRecord> records =
-      TraceParser::ParseDirectory(dir_path);
+  AnalysisRunResult run = AnalysisPipeline::Run(dir_path);
 
-  if (records.empty()) {
+  if (!run.has_data) {
     QApplication::restoreOverrideCursor();
+    const QString detail = run.warnings.isEmpty()
+        ? QStringLiteral("请确认目录中包含 Clang -ftime-trace 生成的 .json 文件。")
+        : run.warnings.join(QStringLiteral("\n"));
     QMessageBox::information(
         this, QStringLiteral("提示"),
         QStringLiteral("未找到有效的 -ftime-trace JSON 文件。\n\n"
-                       "请确认目录中包含 Clang -ftime-trace 生成的 .json 文件。"));
+                       "%1").arg(detail));
     return;
   }
 
-  model_->SetRecords(records);
+  model_->SetFiles(run.report.files);
   table_view_->resizeColumnsToContents();
 
   QApplication::restoreOverrideCursor();
@@ -158,7 +160,7 @@ void MainWindow::UpdateStatusBar() {
         proxy_model_->mapToSource(proxy_model_->index(proxy_row, 0));
     if (!source_index.isValid()) continue;
     total_ms +=
-        model_->records()[source_index.row()].total_duration_ms;
+        model_->files()[source_index.row()].total_duration_ms;
     ++total_visible;
   }
 

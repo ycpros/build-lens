@@ -4,7 +4,7 @@
 # ============================================================
 
 cmake_minimum_required(VERSION 3.16)
-project(BuildLens VERSION 0.3.0 LANGUAGES CXX)
+project(BuildLens VERSION 0.4.0 LANGUAGES CXX)
 
 # ----- 编译标准 -----
 # 使用 C++17。
@@ -27,8 +27,11 @@ find_package(Qt6 EXACT REQUIRED COMPONENTS Widgets Core)
 
 # ----- 共享 core 源文件（桌面 UI 和 CLI 共用）-----
 set(BUILDLENS_CORE_SOURCES
-    # v0.1 数据层
-    src/core/TraceRecord.h
+    # 版本信息
+    src/core/BuildLensVersion.h
+
+    # 数据模型
+    src/core/FileSummary.h
     src/core/TraceParser.h
     src/core/TraceParser.cpp
 
@@ -110,5 +113,5 @@ add_test(
     NAME BuildLensCLIFixtureSmoke
     COMMAND BuildLensCLI
             --input "${CMAKE_SOURCE_DIR}/resources/BuildLensSample/src"
-            --output "${CMAKE_BINARY_DIR}/buildlens-v0.3-fixture.json"
+            --output "${CMAKE_BINARY_DIR}/buildlens-v0.4-fixture.json"
 )

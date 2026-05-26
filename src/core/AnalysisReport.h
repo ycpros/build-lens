@@ -18,15 +18,8 @@
 
 #include "core/BottleneckDetector.h"
 #include "core/CriticalPathAnalyzer.h"
+#include "core/FileSummary.h"
 #include "core/HotspotAnalyzer.h"
-
-// 单个文件的分析摘要（用于文件列表视图）。
-struct FileSummary {
-  QString filename;
-  QString source_path;
-  double total_duration_ms = 0.0;
-  int event_count = 0;
-};
 
 // 统一分析报告。
 //

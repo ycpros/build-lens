@@ -17,7 +17,6 @@
 #include "core/HotspotAnalyzer.h"
 #include "core/TraceGraphBuilder.h"
 #include "core/TraceParser.h"
-#include "core/TraceRecord.h"
 
 namespace {
 
@@ -84,41 +83,6 @@ double ExtractTotalDurationUs(const std::vector<TraceEvent>& events) {
   return 0.0;
 }
 
-std::vector<TraceRecord> BuildRecordsFromEvents(
-    const std::vector<FileTraceResult>& file_results,
-    QStringList* warnings) {
-  std::vector<TraceRecord> records;
-  records.reserve(file_results.size());
-
-  for (const FileTraceResult& file : file_results) {
-    const double total_duration_us = ExtractTotalDurationUs(file.events);
-    if (total_duration_us <= 0.0) {
-      warnings->append(QStringLiteral("未找到总耗时事件：%1")
-                           .arg(file.source_path));
-      continue;
-    }
-
-    TraceRecord record;
-    record.filename = file.filename;
-    record.source_path = file.source_path;
-    record.total_duration_ms = total_duration_us / 1000.0;
-    records.push_back(std::move(record));
-  }
-
-  return records;
-}
-
-const TraceRecord* FindRecordByPath(
-    const std::vector<TraceRecord>& records,
-    const QString& source_path) {
-  for (const TraceRecord& record : records) {
-    if (record.source_path == source_path) {
-      return &record;
-    }
-  }
-  return nullptr;
-}
-
 void SortFileSummaries(std::vector<FileSummary>* files) {
   std::sort(files->begin(), files->end(),
             [](const FileSummary& a, const FileSummary& b) {
@@ -149,9 +113,6 @@ AnalysisRunResult AnalysisPipeline::Run(
   result.has_data = true;
   result.report.total_file_count = static_cast<int>(file_results.size());
 
-  std::vector<TraceRecord> records =
-      BuildRecordsFromEvents(file_results, &result.warnings);
-
   std::vector<CompileGraph> graphs;
   graphs.reserve(file_results.size());
 
@@ -161,11 +122,14 @@ AnalysisRunResult AnalysisPipeline::Run(
     summary.source_path = file.source_path;
     summary.event_count = static_cast<int>(file.events.size());
 
-    const TraceRecord* record = FindRecordByPath(records, file.source_path);
-    if (record != nullptr) {
-      summary.total_duration_ms = record->total_duration_ms;
+    const double total_duration_us = ExtractTotalDurationUs(file.events);
+    if (total_duration_us <= 0.0) {
+      result.warnings.append(QStringLiteral("未找到总耗时事件：%1")
+                                 .arg(file.source_path));
+    } else {
+      summary.total_duration_ms = total_duration_us / 1000.0;
       result.report.total_build_time_s +=
-          record->total_duration_ms / 1000.0;
+          summary.total_duration_ms / 1000.0;
     }
     result.report.files.push_back(std::move(summary));
 
@@ -195,7 +159,8 @@ AnalysisRunResult AnalysisPipeline::Run(
       HotspotAnalyzer::AnalyzeSourceHotspots(graphs, normalized_options.top_n);
 
   result.report.bottlenecks =
-      BottleneckDetector::Detect(records, normalized_options.threshold_sigma);
+      BottleneckDetector::Detect(result.report.files,
+                                 normalized_options.threshold_sigma);
 
   return result;
 }

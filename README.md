@@ -119,8 +119,9 @@ v0.3 introduces breaking schema changes to the CLI JSON report:
 - New `sourceHotspots` section aggregates `Source` events by specific header/source path.
 - `bottlenecks` now includes `thresholdMs`.
 
-The desktop GUI remains a file-duration table. In-depth v0.3 analysis is driven by
-the `BuildLensCLI` JSON report.
+Since v0.4, CLI and desktop GUI share the same `AnalysisPipeline`. The GUI still
+shows a file-duration table for now, but its data comes from the unified report
+pipeline rather than the old total-duration parser path.
 
 ---
 
@@ -139,15 +140,17 @@ build-lens/
     ├── cli/
     │   └── cli_main.cpp           # CLI entry point
     ├── core/                      # Data layer (no UI dependency)
+    │   ├── BuildLensVersion.h     # Centralized app/report versions
+    │   ├── FileSummary.h          # Per-file analysis summary
     │   ├── TraceEvent.h           # Event data structures
-    │   ├── TraceRecord.h          # Total-duration records
     │   ├── TraceParser.h/.cpp     # JSON parser
     │   ├── TraceGraph.h           # Call graph data structures
     │   ├── TraceGraphBuilder.h/.cpp  # Stack-based call tree construction
     │   ├── CriticalPathAnalyzer.h/.cpp # DFS longest path
     │   ├── HotspotAnalyzer.h/.cpp     # Hotspot aggregation
     │   ├── BottleneckDetector.h/.cpp  # Anomaly detection
-    │   └── AnalysisReport.h/.cpp      # Unified JSON report
+    │   ├── AnalysisReport.h/.cpp      # Unified JSON report
+    │   └── AnalysisPipeline.h/.cpp    # Shared CLI/GUI orchestration
     ├── model/                     # Qt Model/View
     │   └── TraceTableModel.h/.cpp
     └── ui/                        # Qt GUI
@@ -164,7 +167,8 @@ build-lens/
 v0.1 ✅ Desktop GUI — sortable/filterable table
 v0.2 ✅ CLI + three-analyzer pipeline — critical path/hotspot/bottleneck + JSON report
 v0.3 ✅ Semantic fixes — exclusive duration, Total filtering, source/header hotspots
-v0.4 ⏳ CI/CD integration — multi-session comparison, build regression detection
+v0.4 ✅ AnalysisPipeline — shared CLI/GUI pipeline + legacy cleanup
+v0.5 ⏳ CI/CD integration — multi-session comparison, build regression detection
 v1.0 ⏳ Web Dashboard — team collaboration, AI optimization suggestions
 ```
 

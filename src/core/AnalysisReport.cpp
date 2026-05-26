@@ -8,6 +8,8 @@
 
 #include "core/AnalysisReport.h"
 
+#include "core/BuildLensVersion.h"
+
 #include <QJsonArray>
 
 // ====================================================================
@@ -18,7 +20,7 @@ QJsonDocument AnalysisReport::ToJsonDocument() const {
   QJsonObject root;
 
   // 元信息。
-  root["version"] = "0.3.0";
+  root["version"] = QString::fromLatin1(buildlens::kReportSchemaVersion);
   root["totalFileCount"] = total_file_count;
   root["totalBuildTimeSeconds"] = total_build_time_s;
 

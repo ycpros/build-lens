@@ -6,27 +6,30 @@
 // ============================================================
 
 #include "core/BottleneckDetector.h"
-#include "core/TraceRecord.h"
 
 #include <algorithm>
 #include <cmath>
 
 // static
 BottleneckResult BottleneckDetector::Detect(
-    const std::vector<TraceRecord>& records,
+    const std::vector<FileSummary>& files,
     double threshold_sigma) {
   BottleneckResult result;
   result.threshold_multiplier = threshold_sigma;
 
-  if (records.empty()) {
+  if (files.empty()) {
     return result;
   }
 
   // 提取所有文件的耗时列表（毫秒）。
   std::vector<double> durations;
-  durations.reserve(records.size());
-  for (const TraceRecord& rec : records) {
-    durations.push_back(rec.total_duration_ms);
+  durations.reserve(files.size());
+  for (const FileSummary& file : files) {
+    if (file.total_duration_ms <= 0.0) continue;
+    durations.push_back(file.total_duration_ms);
+  }
+  if (durations.empty()) {
+    return result;
   }
 
   // ── 计算均值 ──
@@ -54,13 +57,14 @@ BottleneckResult BottleneckDetector::Detect(
   }
 
   // ── 检测异常 ──
-  for (const TraceRecord& rec : records) {
-    if (rec.total_duration_ms > result.threshold_ms) {
+  for (const FileSummary& file : files) {
+    if (file.total_duration_ms <= 0.0) continue;
+    if (file.total_duration_ms > result.threshold_ms) {
       BottleneckItem item;
-      item.name = rec.filename;
-      item.duration_ms = rec.total_duration_ms;
+      item.name = file.filename;
+      item.duration_ms = file.total_duration_ms;
       item.anomaly_score =
-          (rec.total_duration_ms - mean) / stddev;
+          (file.total_duration_ms - mean) / stddev;
       result.bottlenecks.push_back(item);
     }
   }

@@ -22,11 +22,13 @@
 #endif
 
 #include "core/AnalysisPipeline.h"
+#include "core/BuildLensVersion.h"
 
 int main(int argc, char* argv[]) {
   QCoreApplication app(argc, argv);
   QCoreApplication::setApplicationName("BuildLens CLI");
-  QCoreApplication::setApplicationVersion("0.3.0");
+  QCoreApplication::setApplicationVersion(
+      QString::fromLatin1(buildlens::kApplicationVersion));
 
   // Windows 控制台默认 GBK，SetConsoleOutputCP(CP_UTF8) 修复中文乱码。
 #ifdef Q_OS_WIN

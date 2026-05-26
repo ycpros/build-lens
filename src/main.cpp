@@ -7,6 +7,7 @@
 
 #include <QApplication>
 
+#include "core/BuildLensVersion.h"
 #include "ui/MainWindow.h"
 
 int main(int argc, char* argv[]) {
@@ -14,7 +15,8 @@ int main(int argc, char* argv[]) {
 
   // 设置应用元信息，影响 QSettings 存储路径等。
   QApplication::setApplicationName(QStringLiteral("BuildLens"));
-  QApplication::setApplicationVersion(QStringLiteral("0.3.0"));
+  QApplication::setApplicationVersion(
+      QString::fromLatin1(buildlens::kApplicationVersion));
   QApplication::setOrganizationName(QStringLiteral("BuildLens"));
 
   MainWindow window;

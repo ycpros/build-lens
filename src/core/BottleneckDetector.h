@@ -13,6 +13,8 @@
 
 #include <vector>
 
+#include "core/FileSummary.h"
+
 // 单个瓶颈项。
 struct BottleneckItem {
   // 源文件名，例如 "big_header.cpp"。
@@ -51,15 +53,14 @@ struct BottleneckResult {
 // N 默认为 2.0（约对应正态分布的前 2.3%）。
 //
 // 用法：
-//   auto records = TraceParser::ParseDirectory("path/to/build");
-//   BottleneckResult result = BottleneckDetector::Detect(records);
+//   BottleneckResult result = BottleneckDetector::Detect(report.files);
 //   → result.bottlenecks 包含异常慢的文件。
 class BottleneckDetector {
  public:
   // 检测瓶颈文件。
-  // records：ParseDirectory 输出的编译记录列表（每个文件一条总耗时）。
+  // files：AnalysisPipeline 输出的文件摘要列表（每个文件一条总耗时）。
   // threshold_sigma：阈值倍率，默认 2.0（均值 + 2σ）。
-  static BottleneckResult Detect(const std::vector<struct TraceRecord>& records,
+  static BottleneckResult Detect(const std::vector<FileSummary>& files,
                                  double threshold_sigma = 2.0);
 };
 

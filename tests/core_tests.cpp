@@ -12,8 +12,7 @@
 #include <vector>
 
 #include "core/AnalysisPipeline.h"
-#include "core/AnalysisReport.h"
-#include "core/BottleneckDetector.h"
+#include "core/BuildLensVersion.h"
 #include "core/CriticalPathAnalyzer.h"
 #include "core/HotspotAnalyzer.h"
 #include "core/TraceGraphBuilder.h"
@@ -307,10 +306,8 @@ void TestRealBuildLensSampleFixture() {
 
   std::vector<FileTraceResult> files =
       TraceParser::ParseDirectoryEvents(fixture_dir);
-  std::vector<TraceRecord> records = TraceParser::ParseDirectory(fixture_dir);
 
   Check(files.size() == 9, "real fixture parses 9 source trace files");
-  Check(records.size() == 9, "real fixture yields 9 total-duration records");
 
   bool saw_source = false;
   bool saw_summary = false;
@@ -333,51 +330,45 @@ void TestRealBuildLensSampleFixture() {
   Check(saw_summary, "real fixture contains Total summary events");
   Check(saw_detail, "real fixture contains args.detail values");
 
-  std::vector<CompileGraph> graphs;
-  graphs.reserve(files.size());
-  AnalysisReport report;
-  report.total_file_count = static_cast<int>(files.size());
+  AnalysisRunResult run = AnalysisPipeline::Run(fixture_dir);
+  Check(run.has_data, "real fixture pipeline has data");
+  Check(run.report.total_file_count == 9,
+        "real fixture pipeline reports 9 files");
 
-  for (const FileTraceResult& file : files) {
-    CompileGraph graph = TraceGraphBuilder::Build(file.source_path, file.events);
-    CriticalPathResult cp = CriticalPathAnalyzer::Analyze(graph);
-    if (cp.total_duration_us > report.critical_path.total_duration_us) {
-      report.critical_path = std::move(cp);
-    }
-    graphs.push_back(std::move(graph));
-  }
-
-  report.hotspots_by_name =
-      HotspotAnalyzer::Analyze(graphs, HotspotAnalyzer::Dimension::kByName, 10);
-  report.hotspots_by_category =
-      HotspotAnalyzer::Analyze(graphs, HotspotAnalyzer::Dimension::kByCategory, 10);
-  report.source_hotspots = HotspotAnalyzer::AnalyzeSourceHotspots(graphs, 10);
-  report.bottlenecks = BottleneckDetector::Detect(records, 2.0);
-
-  Check(!report.critical_path.path.empty(), "real fixture critical path exists");
-  Check(report.critical_path.total_duration_us > 0.0,
+  Check(!run.report.critical_path.path.empty(),
+        "real fixture critical path exists");
+  Check(run.report.critical_path.total_duration_us > 0.0,
         "real fixture critical path has wall-clock duration");
-  Check(!report.hotspots_by_category.hotspots.empty(),
+  Check(!run.report.critical_path.source_file.isEmpty(),
+        "real fixture critical path has source file");
+  Check(!run.report.critical_path.source_path.isEmpty(),
+        "real fixture critical path has source path");
+  Check(!run.report.hotspots_by_category.hotspots.empty(),
         "real fixture category hotspots exist");
-  Check(!report.source_hotspots.hotspots.empty(),
+  Check(!run.report.source_hotspots.hotspots.empty(),
         "real fixture source hotspots exist");
-  Check(report.source_hotspots.hotspots[0].key != QStringLiteral("Source"),
+  Check(run.report.source_hotspots.hotspots[0].key != QStringLiteral("Source"),
         "real fixture source hotspot key is a detail path");
 
   bool saw_total_hotspot = false;
-  for (const HotspotItem& item : report.hotspots_by_name.hotspots) {
+  for (const HotspotItem& item : run.report.hotspots_by_name.hotspots) {
     if (item.key.startsWith(QStringLiteral("Total "))) {
       saw_total_hotspot = true;
     }
   }
   Check(!saw_total_hotspot, "real fixture excludes Total events from hotspots");
 
-  QJsonObject root = report.ToJsonDocument().object();
-  Check(root.value("version").toString() == QStringLiteral("0.3.0"),
-        "report JSON version is 0.3.0");
+  QJsonObject root = run.report.ToJsonDocument().object();
+  Check(root.value("version").toString() ==
+            QString::fromLatin1(buildlens::kReportSchemaVersion),
+        "report JSON version matches centralized schema version");
   Check(root.contains("sourceHotspots"), "report JSON has sourceHotspots");
   Check(root.value("bottlenecks").toObject().contains("thresholdMs"),
         "report JSON has bottlenecks.thresholdMs");
+  Check(root.value("criticalPath").toObject().contains("sourceFile"),
+        "report JSON has criticalPath.sourceFile");
+  Check(root.value("criticalPath").toObject().contains("sourcePath"),
+        "report JSON has criticalPath.sourcePath");
 
   QJsonObject first_path_item =
       root.value("criticalPath")
